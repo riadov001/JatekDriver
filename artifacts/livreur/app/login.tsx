@@ -114,11 +114,19 @@ export default function LoginScreen() {
     } catch (e: unknown) {
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       const msg = e instanceof Error ? e.message : "Échec de la connexion";
-      setError(
-        msg.includes("401") || msg.toLowerCase().includes("unauthorized")
-          ? "Email ou mot de passe incorrect"
-          : msg,
-      );
+      let friendly = "Échec de la connexion. Réessayez.";
+      if (msg.includes("401") || msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("invalid")) {
+        friendly = "Email ou mot de passe incorrect";
+      } else if (msg.toLowerCase().includes("livreur")) {
+        friendly = "Ce compte n'est pas un compte livreur. Utilisez uniquement un compte livreur.";
+      } else if (msg.toLowerCase().includes("network") || msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("failed to fetch")) {
+        friendly = "Impossible de joindre le serveur. Vérifiez votre connexion internet.";
+      } else if (msg.includes("<!") || msg.toLowerCase().includes("parse") || msg.toLowerCase().includes("json")) {
+        friendly = "Erreur de connexion au serveur. Réessayez dans quelques instants.";
+      } else if (msg.toLowerCase().includes("disabled") || msg.toLowerCase().includes("désactivé")) {
+        friendly = "Ce compte est désactivé. Contactez l'administrateur.";
+      }
+      setError(friendly);
     } finally {
       setLoading(false);
     }
