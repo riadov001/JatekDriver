@@ -29,6 +29,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshDriver: () => Promise<void>;
+  hydrate: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -125,8 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       refreshDriver,
+      hydrate,
     }),
-    [token, user, driver, loading, login, logout, refreshDriver],
+    [token, user, driver, loading, login, logout, refreshDriver, hydrate],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

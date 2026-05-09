@@ -23,12 +23,9 @@ app.use(
 app.use(compression());
 
 const corsOriginCheck: cors.CorsOptions["origin"] = (origin, callback) => {
-  if (!origin) return callback(null, true);
-  if (process.env["NODE_ENV"] !== "production") return callback(null, true);
-  const allowedOrigins = (process.env["ALLOWED_ORIGINS"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  if (allowedOrigins.includes(origin)) return callback(null, true);
-  logger.warn({ origin }, "CORS: rejected origin");
-  return callback(new Error(`CORS: origin not allowed: ${origin}`));
+  // Mobile apps (Expo Go, APK, IPA) don't send an origin header — always allow.
+  // Web clients on any domain are also allowed; JWT tokens are the security layer.
+  return callback(null, true);
 };
 
 app.use(

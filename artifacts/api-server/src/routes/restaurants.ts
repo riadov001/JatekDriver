@@ -186,7 +186,7 @@ router.patch("/restaurants/:id", requireRole("admin", "restaurant_owner"), async
  * the ability to accept incoming orders.
  */
 router.post("/restaurants/:id/complete-profile", requireRole("admin", "restaurant_owner"), async (req: AuthedRequest, res): Promise<void> => {
-  const id = parseInt(req.params.id ?? "", 10);
+  const id = parseInt((req.params.id as string) ?? "", 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [existing] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id)).limit(1);
