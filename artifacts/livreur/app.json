@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "Jatek Livreur",
-    "slug": "livreur",
+    "name": "Jatek-drive",
+    "slug": "jatekdrive",
     "owner": "jatek",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "livreur",
+    "scheme": "jatekdrive",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -18,10 +18,11 @@
       "supportsTablet": false,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Permet de partager votre position en temps réel pendant les livraisons"
-      }
+      },
+      "bundleIdentifier": "com.jatekdrive.app"
     },
     "android": {
-      "package": "app.jatek.livreur",
+      "package": "com.jatekdrive.app",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
@@ -32,7 +33,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       [
