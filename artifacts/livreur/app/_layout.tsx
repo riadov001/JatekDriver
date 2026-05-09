@@ -21,7 +21,11 @@ import { useColors } from "@/hooks/useColors";
 
 import { storage } from "@/lib/storage";
 
-setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
+setBaseUrl(
+  process.env.EXPO_PUBLIC_API_DOMAIN
+    ? `https://${process.env.EXPO_PUBLIC_API_DOMAIN}`
+    : "https://driver.jatek.app"
+);
 setAuthTokenGetter(async () => {
   try {
     return await storage.getItemAsync("jatek_driver_token");
