@@ -24,7 +24,7 @@ import { storage } from "@/lib/storage";
 setBaseUrl(
   process.env.EXPO_PUBLIC_API_DOMAIN
     ? `https://${process.env.EXPO_PUBLIC_API_DOMAIN}`
-    : "https://driver.jatek.app"
+    : "https://ma.jatek.app"
 );
 setAuthTokenGetter(async () => {
   try {
