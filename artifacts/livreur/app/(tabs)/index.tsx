@@ -7,10 +7,12 @@ import {
   useListOrders,
   type Order,
 } from "@workspace/api-client-react";
+import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback } from "react";
 import {
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -111,6 +113,27 @@ export default function HomeScreen() {
         />
       </View>
 
+      {driver && !driver.profileCompletedAt && (
+        <Pressable
+          onPress={() => router.push("/complete-profile")}
+          style={[
+            styles.profileBanner,
+            { backgroundColor: colors.warning + "22", borderColor: colors.warning, borderRadius: colors.radius },
+          ]}
+        >
+          <Feather name="alert-triangle" size={18} color={colors.warning} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.bannerTitle, { color: colors.foreground }]}>
+              Profil incomplet
+            </Text>
+            <Text style={[styles.bannerSub, { color: colors.mutedForeground }]}>
+              Complétez votre profil pour accepter des livraisons
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+        </Pressable>
+      )}
+
       <View style={styles.statsRow}>
         <StatCard
           label="Aujourd'hui"
@@ -209,4 +232,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   badgeText: { fontFamily: "Inter_700Bold", fontSize: 12 },
+  profileBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderWidth: 1.5,
+    marginTop: 16,
+  },
+  bannerTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  bannerSub: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
 });
