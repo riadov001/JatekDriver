@@ -1,12 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import {
   useAcceptOrderDelivery,
-  useGetAvailableOrders,
   getGetAvailableOrdersQueryKey,
   getListOrdersQueryKey,
   type Order,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -27,6 +27,7 @@ interface AvailableOrderCardProps {
 export function AvailableOrderCard({ order, driverId }: AvailableOrderCardProps) {
   const colors = useColors();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [accepting, setAccepting] = useState(false);
 
   const acceptMutation = useAcceptOrderDelivery({
@@ -49,6 +50,9 @@ export function AvailableOrderCard({ order, driverId }: AvailableOrderCardProps)
     setAccepting(true);
     try {
       await acceptMutation.mutateAsync({ id: order.id, data: { driverId } });
+      router.push(`/order/${order.id}`);
+    } catch {
+      // error handled in onError
     } finally {
       setAccepting(false);
     }
@@ -87,15 +91,24 @@ export function AvailableOrderCard({ order, driverId }: AvailableOrderCardProps)
       </View>
 
       <View style={[styles.footerRow, { borderTopColor: colors.border }]}>
-        <Text style={[styles.total, { color: colors.foreground }]}>
-          {order.total.toFixed(2)} MAD
-        </Text>
+        <View>
+          <Text style={[styles.total, { color: colors.foreground }]}>
+            {order.total.toFixed(2)} MAD
+          </Text>
+          <Text style={[styles.fee, { color: colors.success }]}>
+            +{((order.deliveryFee ?? 0) * 0.8).toFixed(2)} MAD gain
+          </Text>
+        </View>
         <Pressable
           onPress={handleAccept}
           disabled={accepting}
           style={[
             styles.acceptBtn,
-            { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: accepting ? 0.7 : 1 },
+            {
+              backgroundColor: colors.primary,
+              borderRadius: colors.radius,
+              opacity: accepting ? 0.7 : 1,
+            },
           ]}
         >
           {accepting ? (
@@ -171,6 +184,11 @@ const styles = StyleSheet.create({
   total: {
     fontFamily: "Inter_700Bold",
     fontSize: 16,
+  },
+  fee: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    marginTop: 2,
   },
   acceptBtn: {
     paddingHorizontal: 20,
