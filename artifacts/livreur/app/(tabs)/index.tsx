@@ -1,7 +1,9 @@
 import {
   getGetDriverEarningsQueryKey,
+  getGetAvailableOrdersQueryKey,
   getListOrdersQueryKey,
   useGetDriverEarnings,
+  useGetAvailableOrders,
   useListOrders,
   type Order,
 } from "@workspace/api-client-react";
@@ -17,6 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AvailableOrderCard } from "@/components/AvailableOrderCard";
 import { EmptyState } from "@/components/EmptyState";
 import { Logo } from "@/components/Logo";
 import { OnlineToggle } from "@/components/OnlineToggle";
@@ -53,10 +56,19 @@ export default function HomeScreen() {
     },
   );
 
+  const availableQuery = useGetAvailableOrders({
+    query: {
+      queryKey: getGetAvailableOrdersQueryKey(),
+      enabled: online && !!driverId,
+      refetchInterval: online ? 10000 : false,
+    },
+  });
+
   const onRefresh = useCallback(() => {
     earningsQuery.refetch();
     ordersQuery.refetch();
-  }, [earningsQuery, ordersQuery]);
+    if (online) availableQuery.refetch();
+  }, [earningsQuery, ordersQuery, availableQuery, online]);
 
   const activeOrders: Order[] = (ordersQuery.data ?? []).filter((o) =>
     ACTIVE_STATUSES.has(o.status),
@@ -116,6 +128,26 @@ export default function HomeScreen() {
         />
       </View>
 
+      {online && (availableQuery.data?.length ?? 0) > 0 && (
+        <View style={styles.section}>
+          <View style={styles.sectionHead}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+              Courses disponibles
+            </Text>
+            <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>
+                {availableQuery.data?.length}
+              </Text>
+            </View>
+          </View>
+          <View style={{ gap: 12 }}>
+            {availableQuery.data!.map((o) => (
+              <AvailableOrderCard key={o.id} order={o} driverId={driverId!} />
+            ))}
+          </View>
+        </View>
+      )}
+
       <View style={styles.section}>
         <View style={styles.sectionHead}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Courses actives</Text>
@@ -169,4 +201,12 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
   sectionCount: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   skeleton: { height: 140, opacity: 0.6 },
+  badge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: { fontFamily: "Inter_700Bold", fontSize: 12 },
 });
