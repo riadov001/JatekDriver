@@ -86,7 +86,7 @@ export default function OrderDetailScreen() {
       },
       onError: (err: unknown) => {
         const msg =
-          (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+          (err as { data?: { error?: string } })?.data?.error ??
           "Code OTP incorrect";
         Alert.alert("Code incorrect", msg);
         setOtpValue("");

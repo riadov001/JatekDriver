@@ -40,7 +40,7 @@ export default function CompleteProfileScreen() {
       },
       onError: (err: unknown) => {
         const msg =
-          (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+          (err as { data?: { error?: string } })?.data?.error ??
           "Une erreur est survenue";
         Alert.alert("Erreur", msg);
       },

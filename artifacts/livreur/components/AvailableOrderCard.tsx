@@ -38,7 +38,7 @@ export function AvailableOrderCard({ order, driverId }: AvailableOrderCardProps)
       },
       onError: (err: unknown) => {
         const msg =
-          (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
+          (err as { data?: { error?: string } })?.data?.error ??
           "Impossible d'accepter la commande";
         Alert.alert("Erreur", msg);
       },
@@ -50,6 +50,10 @@ export function AvailableOrderCard({ order, driverId }: AvailableOrderCardProps)
     setAccepting(true);
     try {
       await acceptMutation.mutateAsync({ id: order.id, data: { driverId } });
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: getListOrdersQueryKey({ driverId }) }),
+        queryClient.invalidateQueries({ queryKey: getGetAvailableOrdersQueryKey() }),
+      ]);
       router.push(`/order/${order.id}`);
     } catch {
       // error handled in onError
