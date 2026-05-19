@@ -22,6 +22,7 @@ import promoCodesRouter from "./promoCodes";
 import chatRouter from "./chat";
 import notificationsRouter from "./notifications";
 import referralsRouter from "./referrals";
+import remoteConfigRouter from "./remoteConfig";
 import { subscribe } from "../lib/sse";
 import { requireAuth } from "../middlewares/auth";
 
@@ -50,6 +51,7 @@ router.use(promoCodesRouter);
 router.use(chatRouter);
 router.use(notificationsRouter);
 router.use(referralsRouter);
+router.use(remoteConfigRouter);
 
 /**
  * SSE endpoint — clients subscribe to one or more channels:

@@ -80,6 +80,8 @@ import type {
   PaymentMethodBody,
   Quote,
   RegisterBody,
+  RemoteConfig,
+  RemoteConfigBody,
   ResetPasswordBody,
   Restaurant,
   RestaurantStats,
@@ -10180,4 +10182,165 @@ export const useDeleteBackendShort = <
   TContext
 > => {
   return useMutation(getDeleteBackendShortMutationOptions(options));
+};
+
+/**
+ * @summary Get remote configuration (public)
+ */
+export const getGetRemoteConfigUrl = () => {
+  return `/api/remoteconfig`;
+};
+
+export const getRemoteConfig = async (
+  options?: RequestInit,
+): Promise<RemoteConfig> => {
+  return customFetch<RemoteConfig>(getGetRemoteConfigUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetRemoteConfigQueryKey = () => {
+  return [`/api/remoteconfig`] as const;
+};
+
+export const getGetRemoteConfigQueryOptions = <
+  TData = Awaited<ReturnType<typeof getRemoteConfig>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRemoteConfig>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetRemoteConfigQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getRemoteConfig>>> = ({
+    signal,
+  }) => getRemoteConfig({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getRemoteConfig>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetRemoteConfigQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getRemoteConfig>>
+>;
+export type GetRemoteConfigQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get remote configuration (public)
+ */
+
+export function useGetRemoteConfig<
+  TData = Awaited<ReturnType<typeof getRemoteConfig>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getRemoteConfig>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetRemoteConfigQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Update remote configuration (super_admin only)
+ */
+export const getUpdateRemoteConfigUrl = () => {
+  return `/api/backend/remoteconfig`;
+};
+
+export const updateRemoteConfig = async (
+  remoteConfigBody: RemoteConfigBody,
+  options?: RequestInit,
+): Promise<RemoteConfig> => {
+  return customFetch<RemoteConfig>(getUpdateRemoteConfigUrl(), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(remoteConfigBody),
+  });
+};
+
+export const getUpdateRemoteConfigMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateRemoteConfig>>,
+    TError,
+    { data: BodyType<RemoteConfigBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateRemoteConfig>>,
+  TError,
+  { data: BodyType<RemoteConfigBody> },
+  TContext
+> => {
+  const mutationKey = ["updateRemoteConfig"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateRemoteConfig>>,
+    { data: BodyType<RemoteConfigBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return updateRemoteConfig(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateRemoteConfigMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateRemoteConfig>>
+>;
+export type UpdateRemoteConfigMutationBody = BodyType<RemoteConfigBody>;
+export type UpdateRemoteConfigMutationError = ErrorType<void>;
+
+/**
+ * @summary Update remote configuration (super_admin only)
+ */
+export const useUpdateRemoteConfig = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateRemoteConfig>>,
+    TError,
+    { data: BodyType<RemoteConfigBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateRemoteConfig>>,
+  TError,
+  { data: BodyType<RemoteConfigBody> },
+  TContext
+> => {
+  return useMutation(getUpdateRemoteConfigMutationOptions(options));
 };

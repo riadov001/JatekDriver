@@ -1002,6 +1002,30 @@ export interface ShortBody {
   sortOrder?: number;
 }
 
+export interface RemoteConfig {
+  /** URL primaire du backend */
+  primaryUrl: string;
+  /**
+   * URL de fallback 1
+   * @nullable
+   */
+  fallbackUrl1?: string | null;
+  /**
+   * URL de fallback 2
+   * @nullable
+   */
+  fallbackUrl2?: string | null;
+  updatedAt: string;
+}
+
+export interface RemoteConfigBody {
+  primaryUrl?: string;
+  /** @nullable */
+  fallbackUrl1?: string | null;
+  /** @nullable */
+  fallbackUrl2?: string | null;
+}
+
 export type ListBackendCustomersParams = {
   search?: string;
 };

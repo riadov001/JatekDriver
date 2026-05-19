@@ -78,6 +78,8 @@ export * from "./quote";
 export * from "./quoteStatus";
 export * from "./registerBody";
 export * from "./registerBodyRole";
+export * from "./remoteConfig";
+export * from "./remoteConfigBody";
 export * from "./resetPasswordBody";
 export * from "./restaurant";
 export * from "./restaurantStats";

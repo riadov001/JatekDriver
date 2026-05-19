@@ -21,3 +21,4 @@ export * from "./chatMessages";
 export * from "./notifications";
 export * from "./referrals";
 export * from "./driverEarnings";
+export * from "./remoteConfig";

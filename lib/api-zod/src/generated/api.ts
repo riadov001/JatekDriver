@@ -2846,3 +2846,29 @@ export const UpdateBackendShortResponse = zod.object({
 export const DeleteBackendShortParams = zod.object({
   id: zod.coerce.number(),
 });
+
+/**
+ * @summary Get remote configuration (public)
+ */
+export const GetRemoteConfigResponse = zod.object({
+  primaryUrl: zod.string().describe("URL primaire du backend"),
+  fallbackUrl1: zod.string().nullish().describe("URL de fallback 1"),
+  fallbackUrl2: zod.string().nullish().describe("URL de fallback 2"),
+  updatedAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update remote configuration (super_admin only)
+ */
+export const UpdateRemoteConfigBody = zod.object({
+  primaryUrl: zod.string().optional(),
+  fallbackUrl1: zod.string().nullish(),
+  fallbackUrl2: zod.string().nullish(),
+});
+
+export const UpdateRemoteConfigResponse = zod.object({
+  primaryUrl: zod.string().describe("URL primaire du backend"),
+  fallbackUrl1: zod.string().nullish().describe("URL de fallback 1"),
+  fallbackUrl2: zod.string().nullish().describe("URL de fallback 2"),
+  updatedAt: zod.coerce.date(),
+});

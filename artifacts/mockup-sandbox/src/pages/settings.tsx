@@ -7,8 +7,15 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Settings, Globe, Truck, Bell, Shield, CheckCircle2 } from "lucide-react";
-import { useBackendMe } from "@workspace/api-client-react";
+import { Settings, Globe, Truck, Bell, Shield, CheckCircle2, Server, Loader2, AlertCircle } from "lucide-react";
+import {
+  useBackendMe,
+  useGetRemoteConfig,
+  useUpdateRemoteConfig,
+  type RemoteConfigBody,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { getGetRemoteConfigQueryKey } from "@workspace/api-client-react";
 
 const STORAGE_KEY = "jatek_platform_settings";
 
@@ -63,18 +70,185 @@ function Section({ title, icon: Icon, description, children }: { title: string; 
   );
 }
 
-function Field({ label, value, onChange, type = "text", placeholder, suffix }: {
+function Field({ label, value, onChange, type = "text", placeholder, suffix, disabled }: {
   label: string; value: string; onChange: (v: string) => void;
-  type?: string; placeholder?: string; suffix?: string;
+  type?: string; placeholder?: string; suffix?: string; disabled?: boolean;
 }) {
   return (
     <div className="grid gap-1.5">
       <Label>{label}</Label>
       <div className="flex gap-2 items-center">
-        <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="flex-1" />
+        <Input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1"
+          disabled={disabled}
+        />
         {suffix && <span className="text-sm text-muted-foreground whitespace-nowrap">{suffix}</span>}
       </div>
     </div>
+  );
+}
+
+function UrlField({ label, value, onChange, placeholder, badge, disabled }: {
+  label: string; value: string; onChange: (v: string) => void;
+  placeholder: string; badge: string; disabled?: boolean;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <div className="flex items-center gap-2">
+        <Label>{label}</Label>
+        <Badge variant="outline" className="text-xs font-normal">{badge}</Badge>
+      </div>
+      <Input
+        type="url"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="font-mono text-sm"
+      />
+    </div>
+  );
+}
+
+function RemoteConfigSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+  const queryClient = useQueryClient();
+  const { data: config, isLoading, isError } = useGetRemoteConfig({});
+  const [primaryUrl, setPrimaryUrl] = useState("");
+  const [fallbackUrl1, setFallbackUrl1] = useState("");
+  const [fallbackUrl2, setFallbackUrl2] = useState("");
+  const [localInit, setLocalInit] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+
+  if (config && !localInit) {
+    setPrimaryUrl(config.primaryUrl ?? "");
+    setFallbackUrl1(config.fallbackUrl1 ?? "");
+    setFallbackUrl2(config.fallbackUrl2 ?? "");
+    setLocalInit(true);
+  }
+
+  const updateMutation = useUpdateRemoteConfig({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetRemoteConfigQueryKey() });
+        setSavedOk(true);
+        setTimeout(() => setSavedOk(false), 3000);
+      },
+    },
+  });
+
+  const handleSave = () => {
+    const body: RemoteConfigBody = {
+      primaryUrl: primaryUrl.trim() || undefined,
+      fallbackUrl1: fallbackUrl1.trim() || null,
+      fallbackUrl2: fallbackUrl2.trim() || null,
+    };
+    updateMutation.mutate({ data: body });
+  };
+
+  return (
+    <Card className="lg:col-span-2 border-primary/30">
+      <CardHeader>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Server className="h-5 w-5 text-primary" />
+            <CardTitle className="text-base">Configuration API</CardTitle>
+            <Badge variant="secondary" className="text-xs">Super Admin</Badge>
+          </div>
+          {isSuperAdmin && (
+            <div className="flex items-center gap-2">
+              {savedOk && (
+                <span className="flex items-center gap-1 text-sm text-green-600">
+                  <CheckCircle2 className="h-4 w-4" /> Sauvegardé
+                </span>
+              )}
+              {updateMutation.isError && (
+                <span className="flex items-center gap-1 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4" /> Erreur
+                </span>
+              )}
+              <Button
+                size="sm"
+                onClick={handleSave}
+                disabled={updateMutation.isPending || isLoading}
+              >
+                {updateMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Sauvegarde…</>
+                ) : (
+                  "Sauvegarder"
+                )}
+              </Button>
+            </div>
+          )}
+        </div>
+        <CardDescription>
+          URLs du backend interrogées par les applications mobiles et web au démarrage.
+          Les apps utilisent l'URL primaire en priorité, puis les fallbacks si elle est inaccessible.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!isSuperAdmin && (
+          <Alert>
+            <Shield className="h-4 w-4" />
+            <AlertDescription>
+              Seuls les super admins peuvent modifier la configuration API.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {isLoading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Chargement de la configuration…
+          </div>
+        )}
+
+        {isError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>Impossible de charger la configuration API.</AlertDescription>
+          </Alert>
+        )}
+
+        {!isLoading && !isError && (
+          <div className="space-y-4">
+            <UrlField
+              label="URL Primaire"
+              value={primaryUrl}
+              onChange={setPrimaryUrl}
+              placeholder="https://ma.jatek.app"
+              badge="Priorité 1"
+              disabled={!isSuperAdmin}
+            />
+            <Separator />
+            <UrlField
+              label="Fallback 1"
+              value={fallbackUrl1}
+              onChange={setFallbackUrl1}
+              placeholder="https://jatek-app-rbe-26-dekivery-18--delivery18.replit.app"
+              badge="Priorité 2"
+              disabled={!isSuperAdmin}
+            />
+            <UrlField
+              label="Fallback 2"
+              value={fallbackUrl2}
+              onChange={setFallbackUrl2}
+              placeholder="https://backup.jatek.ma"
+              badge="Priorité 3"
+              disabled={!isSuperAdmin}
+            />
+            {config && (
+              <p className="text-xs text-muted-foreground">
+                Dernière mise à jour : {new Date(config.updatedAt).toLocaleString("fr-FR")}
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -93,6 +267,7 @@ export default function SettingsPage() {
   };
 
   const isAdmin = me?.user?.role === "super_admin" || me?.user?.role === "admin";
+  const isSuperAdmin = me?.user?.role === "super_admin";
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -123,19 +298,21 @@ export default function SettingsPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <RemoteConfigSection isSuperAdmin={!!isSuperAdmin} />
+
         <Section title="Informations générales" icon={Globe} description="Nom et coordonnées de la plateforme">
-          <Field label="Nom de l'application" value={settings.appName} onChange={set("appName")} placeholder="Jatek" />
-          <Field label="Ville principale" value={settings.city} onChange={set("city")} placeholder="Oujda" />
-          <Field label="Devise" value={settings.currency} onChange={set("currency")} placeholder="MAD" />
+          <Field label="Nom de l'application" value={settings.appName} onChange={set("appName")} placeholder="Jatek" disabled={!isAdmin} />
+          <Field label="Ville principale" value={settings.city} onChange={set("city")} placeholder="Oujda" disabled={!isAdmin} />
+          <Field label="Devise" value={settings.currency} onChange={set("currency")} placeholder="MAD" disabled={!isAdmin} />
           <Separator />
-          <Field label="Email support" value={settings.supportEmail} onChange={set("supportEmail")} type="email" placeholder="support@jatek.ma" />
-          <Field label="Téléphone support" value={settings.supportPhone} onChange={set("supportPhone")} type="tel" placeholder="+212600000000" />
+          <Field label="Email support" value={settings.supportEmail} onChange={set("supportEmail")} type="email" placeholder="support@jatek.ma" disabled={!isAdmin} />
+          <Field label="Téléphone support" value={settings.supportPhone} onChange={set("supportPhone")} type="tel" placeholder="+212600000000" disabled={!isAdmin} />
         </Section>
 
         <Section title="Livraison" icon={Truck} description="Paramètres par défaut pour les livraisons">
-          <Field label="Frais de livraison par défaut" value={settings.defaultDeliveryFee} onChange={set("defaultDeliveryFee")} type="number" suffix="MAD" />
-          <Field label="Rayon de livraison max" value={settings.maxDeliveryRadiusKm} onChange={set("maxDeliveryRadiusKm")} type="number" suffix="km" />
-          <Field label="Montant minimum de commande" value={settings.minOrderAmount} onChange={set("minOrderAmount")} type="number" suffix="MAD" />
+          <Field label="Frais de livraison par défaut" value={settings.defaultDeliveryFee} onChange={set("defaultDeliveryFee")} type="number" suffix="MAD" disabled={!isAdmin} />
+          <Field label="Rayon de livraison max" value={settings.maxDeliveryRadiusKm} onChange={set("maxDeliveryRadiusKm")} type="number" suffix="km" disabled={!isAdmin} />
+          <Field label="Montant minimum de commande" value={settings.minOrderAmount} onChange={set("minOrderAmount")} type="number" suffix="MAD" disabled={!isAdmin} />
         </Section>
 
         <Section title="Notifications" icon={Bell} description="Activation des notifications système">
