@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Permet de partager votre position en temps réel pendant les livraisons"
+        "NSLocationWhenInUseUsageDescription": "Permet de partager votre position en temps r\u00e9el pendant les livraisons"
       },
       "bundleIdentifier": "com.jatekdrive.app"
     },
@@ -52,7 +52,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "b80a26e7-c5b0-4889-aff7-bccf10cb8c34"
+        "projectId": "d9fb83c6-8937-4456-8886-e10338427439"
       }
     }
   }
