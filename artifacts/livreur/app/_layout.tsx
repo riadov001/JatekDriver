@@ -9,7 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -24,13 +24,13 @@ const REMOTE_CONFIG_CACHE_KEY = "jatek_remote_config";
 
 /**
  * Bootstrap URL — used to fetch the remote config on first launch.
- * Priority: EXPO_PUBLIC_API_URL > EXPO_PUBLIC_API_DOMAIN > hardcoded Replit URL.
+ * Priority: EXPO_PUBLIC_API_URL > EXPO_PUBLIC_API_DOMAIN > production URL.
  */
 const BOOTSTRAP_URL = process.env.EXPO_PUBLIC_API_URL
   ? process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, "")
   : process.env.EXPO_PUBLIC_API_DOMAIN
     ? `https://${process.env.EXPO_PUBLIC_API_DOMAIN}`
-    : "https://jatek-app-rbe-26-dekivery-18--delivery18.replit.app";
+    : "https://ma.jatek.app";
 
 setBaseUrl(BOOTSTRAP_URL);
 
@@ -59,31 +59,47 @@ interface RemoteConfig {
   fallbackUrl2: string | null;
 }
 
+/**
+ * Resolves the API base URL from the remote config endpoint (or cached value).
+ * Always resolves — worst case it keeps the BOOTSTRAP_URL.
+ * Capped at 4 s so a slow network never blocks app startup.
+ */
 async function loadRemoteConfig(): Promise<void> {
-  try {
-    const res = await fetch(`${BOOTSTRAP_URL}/api/remoteconfig`, {
-      headers: { Accept: "application/json" },
-    });
-    if (res.ok) {
-      const config: RemoteConfig = await res.json();
-      if (config.primaryUrl) {
-        setBaseUrl(config.primaryUrl.replace(/\/+$/, ""));
-        await storage.setItemAsync(REMOTE_CONFIG_CACHE_KEY, JSON.stringify(config));
-      }
-    }
-  } catch {
+  const TIMEOUT_MS = 4000;
+
+  const fetchWithTimeout = async (): Promise<void> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
-      const cached = await storage.getItemAsync(REMOTE_CONFIG_CACHE_KEY);
-      if (cached) {
-        const config: RemoteConfig = JSON.parse(cached);
+      const res = await fetch(`${BOOTSTRAP_URL}/api/remoteconfig`, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (res.ok) {
+        const config: RemoteConfig = await res.json();
         if (config.primaryUrl) {
           setBaseUrl(config.primaryUrl.replace(/\/+$/, ""));
+          await storage.setItemAsync(REMOTE_CONFIG_CACHE_KEY, JSON.stringify(config));
         }
       }
     } catch {
-      // keep BOOTSTRAP_URL
+      clearTimeout(timer);
+      try {
+        const cached = await storage.getItemAsync(REMOTE_CONFIG_CACHE_KEY);
+        if (cached) {
+          const config: RemoteConfig = JSON.parse(cached);
+          if (config.primaryUrl) {
+            setBaseUrl(config.primaryUrl.replace(/\/+$/, ""));
+          }
+        }
+      } catch {
+        // keep BOOTSTRAP_URL
+      }
     }
-  }
+  };
+
+  await fetchWithTimeout();
 }
 
 function RootLayoutNav() {
@@ -119,22 +135,23 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
-  const remoteConfigLoaded = useRef(false);
+  const [remoteConfigReady, setRemoteConfigReady] = useState(false);
+  const remoteConfigStarted = useRef(false);
 
   useEffect(() => {
-    if (!remoteConfigLoaded.current) {
-      remoteConfigLoaded.current = true;
-      loadRemoteConfig();
+    if (!remoteConfigStarted.current) {
+      remoteConfigStarted.current = true;
+      loadRemoteConfig().finally(() => setRemoteConfigReady(true));
     }
   }, []);
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
+    if ((fontsLoaded || fontError) && remoteConfigReady) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, remoteConfigReady]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if ((!fontsLoaded && !fontError) || !remoteConfigReady) return null;
 
   return (
     <SafeAreaProvider>
