@@ -30,8 +30,12 @@ router.get("/drivers", async (req, res): Promise<void> => {
   res.json(drivers);
 });
 
-router.get("/drivers/me", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const [driver] = await db.select().from(driversTable).where(eq(driversTable.userId, req.userId!)).limit(1);
+router.get("/drivers/me", async (req: AuthedRequest, res): Promise<void> => {
+  if (!req.userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const [driver] = await db.select().from(driversTable).where(eq(driversTable.userId, req.userId)).limit(1);
   if (!driver) { res.status(404).json({ error: "Driver not found" }); return; }
   res.json(driver);
 });
