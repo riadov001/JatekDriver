@@ -40,7 +40,16 @@ router.get("/drivers/me", async (req: AuthedRequest, res): Promise<void> => {
   res.json(driver);
 });
 
-router.get("/drivers/:id", async (req, res): Promise<void> => {
+router.get("/drivers/:id", async (req: AuthedRequest, res): Promise<void> => {
+  // "me" alias — works even if the dedicated /drivers/me route is shadowed
+  if (req.params.id === "me") {
+    if (!req.userId) { res.status(401).json({ error: "Authentication required" }); return; }
+    const [driver] = await db.select().from(driversTable).where(eq(driversTable.userId, req.userId)).limit(1);
+    if (!driver) { res.status(404).json({ error: "Driver not found" }); return; }
+    res.json(driver);
+    return;
+  }
+
   const params = GetDriverParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -57,6 +66,18 @@ router.get("/drivers/:id", async (req, res): Promise<void> => {
 });
 
 router.patch("/drivers/:id", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
+  // "me" alias — resolve to the authenticated user's driver record
+  if (req.params.id === "me") {
+    if (!req.userId) { res.status(401).json({ error: "Authentication required" }); return; }
+    const [existing] = await db.select().from(driversTable).where(eq(driversTable.userId, req.userId)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Driver not found" }); return; }
+    const parsed = UpdateDriverBody.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+    const [driver] = await db.update(driversTable).set(parsed.data).where(eq(driversTable.id, existing.id)).returning();
+    res.json(driver);
+    return;
+  }
+
   const params = UpdateDriverParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

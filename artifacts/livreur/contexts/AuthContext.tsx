@@ -65,10 +65,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setToken(stored);
       try {
-        const [me, drv] = await Promise.all([fetchMe(), fetchMyDriver()]);
+        const me = await fetchMe();
         setUser(me);
-        setDriver(drv);
-        await storage.setItemAsync(DRIVER_ID_KEY, String(drv.id));
+        try {
+          const drv = await fetchMyDriver();
+          setDriver(drv);
+          await storage.setItemAsync(DRIVER_ID_KEY, String(drv.id));
+        } catch {
+          // Driver profile may not be ready — clear stale driver state but keep session
+          setDriver(null);
+          await storage.deleteItemAsync(DRIVER_ID_KEY);
+        }
       } catch {
         await storage.deleteItemAsync(TOKEN_KEY);
         await storage.deleteItemAsync(DRIVER_ID_KEY);
