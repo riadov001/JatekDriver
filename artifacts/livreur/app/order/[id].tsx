@@ -79,12 +79,19 @@ export default function OrderDetailScreen() {
 
   const isActive = order?.status === "picked_up" || order?.status === "en_route";
 
-  const { polyline, distanceText, durationText, loading: directionsLoading, refetch: refetchDirections } =
-    useDirections(
-      isActive ? coords : null,
-      isActive ? order?.restaurantName : undefined,
-      isActive ? order?.deliveryAddress : undefined,
-    );
+  const {
+    polyline,
+    restaurantCoords,
+    deliveryCoords,
+    distanceText,
+    durationText,
+    loading: directionsLoading,
+    refetch: refetchDirections,
+  } = useDirections(
+    isActive ? coords : null,
+    isActive ? order?.restaurantAddress ?? order?.restaurantName : undefined,
+    isActive ? order?.deliveryAddress : undefined,
+  );
 
   // Auto-follow driver on map
   useMemo(() => {
@@ -217,6 +224,26 @@ export default function OrderDetailScreen() {
                       coordinates={polyline}
                       strokeColor={colors.primary}
                       strokeWidth={4}
+                    />
+                  )}
+
+                  {/* Restaurant marker (green) */}
+                  {restaurantCoords && (
+                    <Marker
+                      coordinate={restaurantCoords}
+                      title="Restaurant"
+                      description={order.restaurantName}
+                      pinColor="#16A34A"
+                    />
+                  )}
+
+                  {/* Delivery marker (red) */}
+                  {deliveryCoords && (
+                    <Marker
+                      coordinate={deliveryCoords}
+                      title="Livraison"
+                      description={order.deliveryAddress}
+                      pinColor="#DC2626"
                     />
                   )}
 

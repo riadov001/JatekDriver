@@ -117,7 +117,14 @@ async function checkMetroHealth() {
     const response = await fetch("http://localhost:8081/status", {
       signal: AbortSignal.timeout(5000),
     });
-    return response.ok;
+    if (!response.ok) return false;
+    // Vite (mockup-sandbox) also serves 200 on /status — distinguish by checking
+    // that the response body is Metro's JSON {"status":"packager-status:running"}
+    // not an HTML page from Vite.
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) return false;
+    const body = await response.json();
+    return typeof body === "object" && body !== null && "status" in body;
   } catch {
     return false;
   }

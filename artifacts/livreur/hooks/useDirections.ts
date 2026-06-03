@@ -8,6 +8,8 @@ interface LatLng {
 
 interface DirectionsResult {
   polyline: LatLng[];
+  restaurantCoords: LatLng | null;
+  deliveryCoords: LatLng | null;
   distanceText: string;
   durationText: string;
   loading: boolean;
@@ -88,12 +90,13 @@ export function useDirections(
   deliveryAddress: string | undefined,
 ): DirectionsResult {
   const [polyline, setPolyline] = useState<LatLng[]>([]);
+  const [restaurantCoords, setRestaurantCoords] = useState<LatLng | null>(null);
+  const [deliveryCoords, setDeliveryCoords] = useState<LatLng | null>(null);
   const [distanceText, setDistanceText] = useState("");
   const [durationText, setDurationText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lastDriverRef = useRef<LatLng | null>(null);
-  const fetchCountRef = useRef(0);
 
   const fetchDirections = useCallback(async (driver: LatLng, restAddr: string, delivAddr: string) => {
     if (!API_KEY) return;
@@ -104,6 +107,10 @@ export function useDirections(
         geocodeAddress(restAddr),
         geocodeAddress(delivAddr),
       ]);
+
+      // Expose geocoded pin locations regardless of whether Directions succeeds
+      setRestaurantCoords(restCoords);
+      setDeliveryCoords(delivCoords);
 
       if (!restCoords || !delivCoords) {
         setError("Impossible de géocoder les adresses");
@@ -131,18 +138,15 @@ export function useDirections(
       }
 
       const route = json.routes[0];
-      const encodedPoly = route.overview_polyline.points;
-      setPolyline(decodePolyline(encodedPoly));
+      setPolyline(decodePolyline(route.overview_polyline.points));
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const legs: any[] = route.legs ?? [];
       const totalDist: number = legs.reduce((s: number, l: any) => s + (l.distance?.value ?? 0), 0);
       const totalDur: number = legs.reduce((s: number, l: any) => s + (l.duration?.value ?? 0), 0);
 
-      const km = (totalDist / 1000).toFixed(1);
-      const mins = Math.round(totalDur / 60);
-      setDistanceText(`${km} km`);
-      setDurationText(`${mins} min`);
+      setDistanceText(`${(totalDist / 1000).toFixed(1)} km`);
+      setDurationText(`${Math.round(totalDur / 60)} min`);
     } catch {
       setError("Erreur réseau");
     } finally {
@@ -152,10 +156,10 @@ export function useDirections(
 
   const refetch = useCallback(() => {
     if (!driverCoords || !restaurantAddress || !deliveryAddress) return;
-    fetchCountRef.current += 1;
     fetchDirections(driverCoords, restaurantAddress, deliveryAddress);
   }, [driverCoords, restaurantAddress, deliveryAddress, fetchDirections]);
 
+  // Fetch on mount and whenever driver moves > 50 m
   useEffect(() => {
     if (!driverCoords || !restaurantAddress || !deliveryAddress) return;
     const prev = lastDriverRef.current;
@@ -165,6 +169,7 @@ export function useDirections(
     fetchDirections(driverCoords, restaurantAddress, deliveryAddress);
   }, [driverCoords, restaurantAddress, deliveryAddress, fetchDirections, polyline.length]);
 
+  // Periodic refresh every 10 s
   useEffect(() => {
     if (!driverCoords || !restaurantAddress || !deliveryAddress) return;
     const id = setInterval(() => {
@@ -173,5 +178,5 @@ export function useDirections(
     return () => clearInterval(id);
   }, [driverCoords, restaurantAddress, deliveryAddress, fetchDirections]);
 
-  return { polyline, distanceText, durationText, loading, error, refetch };
+  return { polyline, restaurantCoords, deliveryCoords, distanceText, durationText, loading, error, refetch };
 }
