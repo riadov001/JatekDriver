@@ -28,7 +28,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  refreshDriver: () => Promise<void>;
+  refreshDriver: () => Promise<Driver | null>;
   hydrate: () => Promise<void>;
 }
 
@@ -123,13 +123,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setDriver(null);
   }, []);
 
-  const refreshDriver = useCallback(async () => {
-    if (!token) return;
+  const refreshDriver = useCallback(async (): Promise<Driver | null> => {
+    if (!token) return null;
     try {
       const drv = await fetchMyDriver();
       setDriver(drv);
+      return drv;
     } catch {
-      // ignore
+      return null;
     }
   }, [token]);
 

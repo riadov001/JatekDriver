@@ -42,12 +42,6 @@
           "origin": "https://replit.com/"
         }
       ],
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": "$GOOGLE_MAPS_API_KEY"
-        }
-      ],
       "expo-font",
       "expo-web-browser",
       "expo-local-authentication",
@@ -66,7 +60,6 @@
       "reactCompiler": true
     },
     "extra": {
-      "googleMapsApiKey": "$GOOGLE_MAPS_API_KEY",
       "eas": {
         "projectId": "3bf3e2da-2317-4261-b2a4-d0a62426be7e"
       }

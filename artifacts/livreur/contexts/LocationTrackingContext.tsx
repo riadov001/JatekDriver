@@ -155,15 +155,20 @@ export function LocationTrackingProvider({ children }: { children: ReactNode }) 
       setToggling(true);
       try {
         // If driverId not yet loaded, attempt a refresh first.
-        if (!driverIdRef.current) {
+        let resolvedId = driverIdRef.current;
+        if (!resolvedId) {
           try {
-            await refreshDriver();
+            const drv = await refreshDriver();
+            if (drv?.id) {
+              resolvedId = drv.id;
+              driverIdRef.current = drv.id;
+            }
           } catch {
             // ignore
           }
         }
 
-        const id = driverIdRef.current;
+        const id = resolvedId;
         if (!id) {
           Alert.alert(
             "Profil introuvable",
