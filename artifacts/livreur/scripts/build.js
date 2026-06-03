@@ -117,15 +117,27 @@ async function checkMetroHealth() {
     const response = await fetch("http://localhost:8081/status", {
       signal: AbortSignal.timeout(5000),
     });
-    if (!response.ok) return false;
+    if (!response.ok) {
+      console.log(`[Metro Health] status=${response.status} (not ok)`);
+      return false;
+    }
     // Vite (mockup-sandbox) also serves 200 on /status — distinguish by checking
     // that the response body is Metro's JSON {"status":"packager-status:running"}
     // not an HTML page from Vite.
     const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("application/json")) return false;
+    if (!contentType.includes("application/json")) {
+      console.log(`[Metro Health] content-type=${contentType} (not JSON)`);
+      return false;
+    }
     const body = await response.json();
-    return typeof body === "object" && body !== null && "status" in body;
-  } catch {
+    const hasStatus = typeof body === "object" && body !== null && "status" in body;
+    if (!hasStatus) {
+      console.log(`[Metro Health] body missing status key: ${JSON.stringify(body)}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.log(`[Metro Health] fetch error: ${err.message}`);
     return false;
   }
 }
@@ -184,7 +196,7 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
     });
   }
 
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 120; i++) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const healthy = await checkMetroHealth();
@@ -194,7 +206,7 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
     }
   }
 
-  console.error("Metro timeout");
+  console.error("Metro timeout — Metro did not become ready within 120 seconds");
   process.exit(1);
 }
 
