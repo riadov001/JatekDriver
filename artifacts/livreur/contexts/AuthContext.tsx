@@ -100,12 +100,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await storage.setItemAsync(TOKEN_KEY, res.token);
     setToken(res.token);
     setUser(res.user);
-    try {
-      const drv = await fetchMyDriver();
-      setDriver(drv);
-      await storage.setItemAsync(DRIVER_ID_KEY, String(drv.id));
-    } catch {
-      // Driver profile may not be ready yet — will be loaded on hydration
+    // Prefer driver embedded in login response (avoids /api/drivers/me call)
+    if (res.driver) {
+      setDriver(res.driver);
+      await storage.setItemAsync(DRIVER_ID_KEY, String(res.driver.id));
+    } else {
+      try {
+        const drv = await fetchMyDriver();
+        setDriver(drv);
+        await storage.setItemAsync(DRIVER_ID_KEY, String(drv.id));
+      } catch {
+        // Driver profile may not be ready yet — will be loaded on hydration
+      }
     }
   }, []);
 

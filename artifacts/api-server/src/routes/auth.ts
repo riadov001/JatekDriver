@@ -90,19 +90,23 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   }
 
   // Auto-heal: if driver user has no driver profile, create it
+  let driverProfile: typeof driversTable.$inferSelect | null = null;
   if (user.role === "driver") {
-    const [existing] = await db.select({ id: driversTable.id }).from(driversTable).where(eq(driversTable.userId, user.id)).limit(1);
+    const [existing] = await db.select().from(driversTable).where(eq(driversTable.userId, user.id)).limit(1);
     if (!existing) {
-      await db.insert(driversTable).values({
+      const [created] = await db.insert(driversTable).values({
         userId: user.id, name: user.name, phone: user.phone ?? null,
         isAvailable: true, totalDeliveries: 0,
-      });
+      }).returning();
+      driverProfile = created ?? null;
+    } else {
+      driverProfile = existing;
     }
   }
 
   const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: "30d" });
   const { password: _pw, ...safeUser } = user;
-  res.json({ token, user: safeUser });
+  res.json({ token, user: safeUser, ...(driverProfile ? { driver: driverProfile } : {}) });
 });
 
 // ─── Send OTP (multi-provider fallback chain) ─────────────────────────────────

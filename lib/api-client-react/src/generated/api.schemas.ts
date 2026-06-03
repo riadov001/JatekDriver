@@ -62,6 +62,8 @@ export interface User {
 export interface AuthResponse {
   token: string;
   user: User;
+  /** Present when the authenticated user is a driver */
+  driver?: Driver;
 }
 
 /**
