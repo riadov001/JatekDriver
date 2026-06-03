@@ -1,6 +1,8 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+
+const icon = require("../assets/images/icon.png");
 
 interface LogoProps {
   size?: "sm" | "md" | "lg";
@@ -8,42 +10,45 @@ interface LogoProps {
 
 export function Logo({ size = "md" }: LogoProps) {
   const colors = useColors();
-  const fontSize = size === "lg" ? 36 : size === "md" ? 28 : 22;
-  const dotSize = size === "lg" ? 14 : size === "md" ? 12 : 10;
+  const imgSize = size === "lg" ? 48 : size === "md" ? 36 : 28;
+  const fontSize = size === "lg" ? 28 : size === "md" ? 20 : 16;
+
   return (
     <View style={styles.row}>
-      <Text
+      <Image
+        source={icon}
         style={{
-          color: colors.foreground,
-          fontFamily: "Inter_700Bold",
-          fontSize,
-          letterSpacing: -1,
+          width: imgSize,
+          height: imgSize,
+          borderRadius: imgSize * 0.22,
         }}
-      >
-        Jatek
-      </Text>
-      <View
-        style={{
-          width: dotSize,
-          height: dotSize,
-          borderRadius: dotSize / 2,
-          backgroundColor: colors.primary,
-          marginLeft: 4,
-          marginBottom: 4,
-        }}
+        resizeMode="cover"
       />
-      <Text
-        style={{
-          color: colors.mutedForeground,
-          fontFamily: "Inter_600SemiBold",
-          fontSize: fontSize * 0.55,
-          marginLeft: 8,
-          letterSpacing: 1.5,
-          textTransform: "uppercase",
-        }}
-      >
-        Livreur
-      </Text>
+      <View style={{ marginLeft: 10 }}>
+        <Text
+          style={{
+            color: colors.foreground,
+            fontFamily: "Inter_700Bold",
+            fontSize,
+            letterSpacing: -0.5,
+            lineHeight: fontSize * 1.1,
+          }}
+        >
+          Jatek
+          <Text style={{ color: colors.primary }}> Drive</Text>
+        </Text>
+        <Text
+          style={{
+            color: colors.mutedForeground,
+            fontFamily: "Inter_500Medium",
+            fontSize: fontSize * 0.6,
+            letterSpacing: 1,
+            textTransform: "uppercase",
+          }}
+        >
+          Livreur
+        </Text>
+      </View>
     </View>
   );
 }
@@ -51,6 +56,6 @@ export function Logo({ size = "md" }: LogoProps) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
   },
 });
