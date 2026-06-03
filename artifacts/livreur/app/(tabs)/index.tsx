@@ -23,8 +23,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AvailableOrderCard } from "@/components/AvailableOrderCard";
 import { EmptyState } from "@/components/EmptyState";
+import { GoOnlineButton } from "@/components/GoOnlineButton";
 import { Logo } from "@/components/Logo";
-import { OnlineToggle } from "@/components/OnlineToggle";
 import { OrderCard } from "@/components/OrderCard";
 import { StatCard } from "@/components/StatCard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -72,7 +72,7 @@ export default function HomeScreen() {
     if (online) availableQuery.refetch();
   }, [earningsQuery, ordersQuery, availableQuery, online]);
 
-  const activeOrders: Order[] = (ordersQuery.data ?? []).filter((o) =>
+  const activeOrders: Order[] = (ordersQuery.data ?? []).filter((o: Order) =>
     ACTIVE_STATUSES.has(o.status),
   );
 
@@ -105,7 +105,7 @@ export default function HomeScreen() {
       </Text>
 
       <View style={styles.section}>
-        <OnlineToggle
+        <GoOnlineButton
           online={online}
           toggling={toggling}
           permissionDenied={permissionDenied}
@@ -164,7 +164,7 @@ export default function HomeScreen() {
             </View>
           </View>
           <View style={{ gap: 12 }}>
-            {availableQuery.data!.map((o) => (
+            {availableQuery.data!.map((o: Order) => (
               <AvailableOrderCard key={o.id} order={o} driverId={driverId!} />
             ))}
           </View>

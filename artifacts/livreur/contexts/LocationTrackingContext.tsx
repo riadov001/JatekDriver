@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
 
 import {
   updateDriver,
@@ -36,12 +36,18 @@ interface LocationTrackingValue {
 const Ctx = createContext<LocationTrackingValue | null>(null);
 
 export function LocationTrackingProvider({ children }: { children: ReactNode }) {
-  const { driverId, driver } = useAuth();
+  const { driverId, driver, refreshDriver } = useAuth();
   const [online, setOnlineState] = useState<boolean>(false);
   const [coords, setCoords] = useState<Coords | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [toggling, setToggling] = useState(false);
   const watcherRef = useRef<Location.LocationSubscription | null>(null);
+
+  // Keep a ref so setOnline can always read the latest driverId synchronously.
+  const driverIdRef = useRef<number | null>(driverId);
+  useEffect(() => {
+    driverIdRef.current = driverId;
+  }, [driverId]);
 
   // Sync initial online state from server-side isAvailable.
   useEffect(() => {
@@ -57,7 +63,6 @@ export function LocationTrackingProvider({ children }: { children: ReactNode }) 
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     if (Platform.OS === "web") {
-      // Web geolocation prompt happens on first getCurrentPositionAsync call.
       return true;
     }
     const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
@@ -71,9 +76,10 @@ export function LocationTrackingProvider({ children }: { children: ReactNode }) 
 
   const broadcast = useCallback(
     async (c: Coords) => {
-      if (!driverId) return;
+      const id = driverIdRef.current;
+      if (!id) return;
       try {
-        await updateDriverLocation(driverId, {
+        await updateDriverLocation(id, {
           latitude: c.latitude,
           longitude: c.longitude,
         });
@@ -81,7 +87,7 @@ export function LocationTrackingProvider({ children }: { children: ReactNode }) 
         // network errors are non-fatal — next tick will retry
       }
     },
-    [driverId],
+    [],
   );
 
   const startWatcher = useCallback(async () => {
@@ -146,9 +152,26 @@ export function LocationTrackingProvider({ children }: { children: ReactNode }) 
 
   const setOnline = useCallback(
     async (next: boolean) => {
-      if (!driverId) return;
       setToggling(true);
       try {
+        // If driverId not yet loaded, attempt a refresh first.
+        if (!driverIdRef.current) {
+          try {
+            await refreshDriver();
+          } catch {
+            // ignore
+          }
+        }
+
+        const id = driverIdRef.current;
+        if (!id) {
+          Alert.alert(
+            "Profil introuvable",
+            "Impossible de charger votre profil livreur. Veuillez vous reconnecter.",
+          );
+          return;
+        }
+
         if (next) {
           const ok = await requestPermission();
           if (!ok) {
@@ -156,16 +179,16 @@ export function LocationTrackingProvider({ children }: { children: ReactNode }) 
             return;
           }
           try {
-            await updateDriver(driverId, { isAvailable: true });
+            await updateDriver(id, { isAvailable: true });
           } catch {
-            // ignore — we'll still try to broadcast
+            // ignore — we'll still start tracking
           }
           setOnlineState(true);
           await startWatcher();
         } else {
           stopWatcher();
           try {
-            await updateDriver(driverId, { isAvailable: false });
+            await updateDriver(id, { isAvailable: false });
           } catch {
             // ignore
           }
@@ -175,10 +198,10 @@ export function LocationTrackingProvider({ children }: { children: ReactNode }) 
         setToggling(false);
       }
     },
-    [driverId, requestPermission, startWatcher, stopWatcher],
+    [refreshDriver, requestPermission, startWatcher, stopWatcher],
   );
 
-  // Auto-start the watcher if we are already online (e.g. after relogin).
+  // Auto-start the watcher if already online (e.g. after relogin).
   useEffect(() => {
     if (online && driverId && !watcherRef.current) {
       (async () => {

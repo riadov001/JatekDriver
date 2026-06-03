@@ -21,12 +21,13 @@ import {
   TextInput,
   View,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocationTracking } from "@/contexts/LocationTrackingContext";
 import { useColors } from "@/hooks/useColors";
+import { useDirections } from "@/hooks/useDirections";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "En attente",
@@ -57,6 +58,8 @@ export default function OrderDetailScreen() {
   const [otpModalVisible, setOtpModalVisible] = useState(false);
   const [otpValue, setOtpValue] = useState("");
   const otpRef = useRef<TextInput>(null);
+  const mapRef = useRef<MapView>(null);
+  const [followDriver, setFollowDriver] = useState(true);
 
   const ordersQuery = useListOrders(
     { driverId: driverId ?? undefined },
@@ -70,9 +73,28 @@ export default function OrderDetailScreen() {
   );
 
   const order: Order | undefined = useMemo(
-    () => (ordersQuery.data ?? []).find((o) => o.id === orderId),
+    () => (ordersQuery.data ?? []).find((o: Order) => o.id === orderId),
     [ordersQuery.data, orderId],
   );
+
+  const isActive = order?.status === "picked_up" || order?.status === "en_route";
+
+  const { polyline, distanceText, durationText, loading: directionsLoading, refetch: refetchDirections } =
+    useDirections(
+      isActive ? coords : null,
+      isActive ? order?.restaurantName : undefined,
+      isActive ? order?.deliveryAddress : undefined,
+    );
+
+  // Auto-follow driver on map
+  useMemo(() => {
+    if (followDriver && coords && mapRef.current && Platform.OS !== "web") {
+      mapRef.current.animateToRegion(
+        { latitude: coords.latitude, longitude: coords.longitude, latitudeDelta: 0.012, longitudeDelta: 0.012 },
+        400,
+      );
+    }
+  }, [coords, followDriver]);
 
   const confirmDelivery = useConfirmOrderDelivery({
     mutation: {
@@ -158,13 +180,14 @@ export default function OrderDetailScreen() {
     );
   }
 
-  const isActive = order.status === "picked_up" || order.status === "en_route";
   const statusColor = STATUS_COLOR[order.status] ?? colors.primary;
 
   const mapRegion =
     coords
       ? { latitude: coords.latitude, longitude: coords.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 }
       : { latitude: 33.5731, longitude: -7.5898, latitudeDelta: 0.05, longitudeDelta: 0.05 };
+
+  const hasEta = distanceText && durationText;
 
   return (
     <>
@@ -177,22 +200,72 @@ export default function OrderDetailScreen() {
         {isActive && (
           <View style={styles.mapContainer}>
             {Platform.OS !== "web" ? (
-              <MapView
-                style={StyleSheet.absoluteFillObject}
-                provider={PROVIDER_GOOGLE}
-                region={mapRegion}
-                showsUserLocation
-                showsMyLocationButton={false}
-                showsCompass={false}
-              >
-                {coords && (
-                  <Marker
-                    coordinate={{ latitude: coords.latitude, longitude: coords.longitude }}
-                    title="Vous"
-                    pinColor={colors.primary}
-                  />
+              <>
+                <MapView
+                  ref={mapRef}
+                  style={StyleSheet.absoluteFillObject}
+                  provider={PROVIDER_GOOGLE}
+                  region={mapRegion}
+                  showsUserLocation
+                  showsMyLocationButton={false}
+                  showsCompass={false}
+                  onPanDrag={() => setFollowDriver(false)}
+                >
+                  {/* Route polyline */}
+                  {polyline.length > 0 && (
+                    <Polyline
+                      coordinates={polyline}
+                      strokeColor={colors.primary}
+                      strokeWidth={4}
+                    />
+                  )}
+
+                  {/* Driver marker */}
+                  {coords && (
+                    <Marker
+                      coordinate={{ latitude: coords.latitude, longitude: coords.longitude }}
+                      title="Vous"
+                      pinColor={colors.primary}
+                    />
+                  )}
+                </MapView>
+
+                {/* ETA banner */}
+                {hasEta && (
+                  <View style={[styles.etaBanner, { backgroundColor: colors.card }]}>
+                    <Feather name="clock" size={14} color={colors.primary} />
+                    <Text style={[styles.etaText, { color: colors.foreground }]}>
+                      {distanceText} · {durationText}
+                    </Text>
+                    {directionsLoading && (
+                      <ActivityIndicator size="small" color={colors.mutedForeground} style={{ marginLeft: 4 }} />
+                    )}
+                  </View>
                 )}
-              </MapView>
+
+                {/* Controls: follow + recalculate */}
+                <View style={styles.mapControls}>
+                  <Pressable
+                    onPress={() => { setFollowDriver(true); }}
+                    style={[
+                      styles.mapControlBtn,
+                      { backgroundColor: followDriver ? colors.primary : colors.card, borderColor: colors.border },
+                    ]}
+                  >
+                    <Feather
+                      name="navigation"
+                      size={16}
+                      color={followDriver ? "#fff" : colors.foreground}
+                    />
+                  </Pressable>
+                  <Pressable
+                    onPress={refetchDirections}
+                    style={[styles.mapControlBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  >
+                    <Feather name="refresh-cw" size={16} color={colors.foreground} />
+                  </Pressable>
+                </View>
+              </>
             ) : (
               <View style={[StyleSheet.absoluteFillObject, styles.mapFallback, { backgroundColor: colors.card }]}>
                 <Feather name="map" size={32} color={colors.mutedForeground} />
@@ -274,7 +347,7 @@ export default function OrderDetailScreen() {
             ]}
           >
             <Text style={[styles.cardTitle, { color: colors.mutedForeground }]}>Articles</Text>
-            {(order.items ?? []).map((item) => (
+            {(order.items ?? []).map((item: { id: number; quantity: number; menuItemName: string; totalPrice: number }) => (
               <View key={item.id} style={styles.itemRow}>
                 <Text
                   style={[
@@ -395,7 +468,6 @@ export default function OrderDetailScreen() {
             },
           ]}
         >
-          {/* Handle */}
           <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
 
           <View style={styles.modalIconRow}>
@@ -479,13 +551,53 @@ const styles = StyleSheet.create({
   ghostBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
 
   /* Map */
-  mapContainer: { height: 260, position: "relative" },
+  mapContainer: { height: 320, position: "relative" },
   mapFallback: {
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
   },
   mapFallbackText: { fontFamily: "Inter_500Medium", fontSize: 13 },
+
+  /* ETA banner */
+  etaBanner: {
+    position: "absolute",
+    top: 10,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+  },
+  etaText: { fontFamily: "Inter_700Bold", fontSize: 14 },
+
+  /* Map controls */
+  mapControls: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    gap: 8,
+  },
+  mapControlBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
   destOverlay: {
     position: "absolute",
     bottom: 0,
