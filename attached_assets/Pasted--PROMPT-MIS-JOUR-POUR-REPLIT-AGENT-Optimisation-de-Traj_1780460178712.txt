@@ -1,0 +1,66 @@
+✅ PROMPT MIS À JOUR POUR REPLIT AGENT (Optimisation de Trajet Google Directions)
+
+Tu es un expert senior React Native / Expo. Intègre maintenant l’optimisation de trajet avec Google Directions dans Jatek Driver.
+RÈGLES CRITIQUES (respecte strictement)
+	•	Zéro base de données locale
+	•	API Base : https://ma.jatek.app/api
+	•	Tout reste 100% fonctionnel après chaque modification
+	•	Priorité : ActiveDeliveryScreen
+1. INSTALLATION REQUISE
+npx expo install react-native-maps-directions
+# OU (si tu préfères sans package supplémentaire)
+npx expo install @mapbox/polyline
+2. CONFIGURATION GOOGLE MAPS (API Key)
+Dans app.json :
+{
+  "expo": {
+    "plugins": [
+      [
+        "react-native-maps",
+        {
+          "androidGoogleMapsApiKey": "VOTRE_CLE_GOOGLE_MAPS",
+          "iosGoogleMapsApiKey": "VOTRE_CLE_GOOGLE_MAPS"
+        }
+      ]
+    ],
+    "extra": {
+      "googleMapsApiKey": "VOTRE_CLE_GOOGLE_MAPS"
+    }
+  }
+}
+Important : La clé doit avoir les APIs suivantes activées :
+	•	Maps SDK for Android
+	•	Maps SDK for iOS
+	•	Directions API
+3. FONCTIONNALITÉS À IMPLÉMENTER DANS ActiveDeliveryScreen
+	•	Carte Google Maps (provider="google")
+	•	Markers : Driver (live), Restaurant, Client
+	•	Polyline optimisée via Google Directions API (meilleur trajet, pas ligne droite)
+	•	Mise à jour du trajet toutes les 5-10 secondes (ou quand position driver change)
+	•	Affichage :
+	◦	Distance restante
+	◦	Temps estimé (ETA)
+	◦	Instructions étape par étape (optionnel)
+	•	Mode “Follow Driver” avec recentrage automatique
+	•	Bouton pour recalculer le trajet manuellement
+Exemple de logique (à adapter) :
+// Fetch directions
+const fetchDirections = async (origin: LatLng, destination: LatLng) => {
+  const response = await fetch(
+    `https://maps.googleapis.com/maps/api/directions/json?` +
+    `origin=${origin.latitude},${origin.longitude}&` +
+    `destination=${destination.latitude},${destination.longitude}&` +
+    `key=${GOOGLE_API_KEY}&mode=driving`
+  );
+  const data = await response.json();
+  // Décoder polyline + extraire distance/ETA
+};
+MODE DE TRAVAIL
+	•	Va droit au but
+	•	Montre d’abord le code actuel de ActiveDeliveryScreen.tsx (ou le fichier maps)
+	•	Propose les modifications complètes
+	•	Après implémentation : “Modification terminée - tout reste fonctionnel”
+	•	Optimise pour performance (évite les appels inutiles à Directions API)
+
+Prêt ?
+Réponds “Prêt” et commence par me montrer le contenu actuel de ActiveDeliveryScreen.tsx (ou le fichier équivalent dans le repo https://github.com/riadov001/JatekDriver) pour qu’on intègre les Directions immédiatement.
