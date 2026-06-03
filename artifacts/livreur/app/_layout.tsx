@@ -18,6 +18,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LocationTrackingProvider } from "@/contexts/LocationTrackingContext";
 import { useColors } from "@/hooks/useColors";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { storage } from "@/lib/storage";
 
 const REMOTE_CONFIG_CACHE_KEY = "jatek_remote_config";
@@ -102,6 +103,11 @@ async function loadRemoteConfig(): Promise<void> {
   await fetchWithTimeout();
 }
 
+function PushNotificationRegistrar() {
+  usePushNotifications();
+  return null;
+}
+
 function RootLayoutNav() {
   const colors = useColors();
   return (
@@ -161,6 +167,7 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <LocationTrackingProvider>
+                  <PushNotificationRegistrar />
                   <RootLayoutNav />
                 </LocationTrackingProvider>
               </AuthProvider>

@@ -6,6 +6,7 @@ import { setAuthTokenGetter } from "@workspace/api-client-react";
 import NotFound from "@/pages/not-found";
 import { AuthGate } from "@/components/AuthGate";
 import { Layout } from "@/components/Layout";
+import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 
 // Pages
 import Login from "@/pages/login";
@@ -28,6 +29,11 @@ import SettingsPage from "@/pages/settings";
 const queryClient = new QueryClient();
 
 setAuthTokenGetter(() => localStorage.getItem("jatek_backend_token"));
+
+function AdminNotifications() {
+  useAdminNotifications();
+  return null;
+}
 
 function Router() {
   return (
@@ -66,6 +72,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <AdminNotifications />
           <Router />
         </WouterRouter>
         <Toaster />

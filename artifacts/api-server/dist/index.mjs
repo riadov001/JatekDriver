@@ -32856,8 +32856,8 @@ var require_lt = __commonJS({
   "../../node_modules/.pnpm/semver@7.7.4/node_modules/semver/functions/lt.js"(exports, module) {
     "use strict";
     var compare2 = require_compare();
-    var lt3 = (a, b, loose) => compare2(a, b, loose) < 0;
-    module.exports = lt3;
+    var lt2 = (a, b, loose) => compare2(a, b, loose) < 0;
+    module.exports = lt2;
   }
 });
 
@@ -32909,7 +32909,7 @@ var require_cmp = __commonJS({
     var neq = require_neq();
     var gt2 = require_gt();
     var gte2 = require_gte();
-    var lt3 = require_lt();
+    var lt2 = require_lt();
     var lte2 = require_lte();
     var cmp = (a, op, b, loose) => {
       switch (op) {
@@ -32940,7 +32940,7 @@ var require_cmp = __commonJS({
         case ">=":
           return gte2(a, b, loose);
         case "<":
-          return lt3(a, b, loose);
+          return lt2(a, b, loose);
         case "<=":
           return lte2(a, b, loose);
         default:
@@ -33695,7 +33695,7 @@ var require_outside = __commonJS({
     var Range = require_range2();
     var satisfies = require_satisfies();
     var gt2 = require_gt();
-    var lt3 = require_lt();
+    var lt2 = require_lt();
     var lte2 = require_lte();
     var gte2 = require_gte();
     var outside = (version3, range, hilo, options) => {
@@ -33706,12 +33706,12 @@ var require_outside = __commonJS({
         case ">":
           gtfn = gt2;
           ltefn = lte2;
-          ltfn = lt3;
+          ltfn = lt2;
           comp = ">";
           ecomp = ">=";
           break;
         case "<":
-          gtfn = lt3;
+          gtfn = lt2;
           ltefn = gte2;
           ltfn = gt2;
           comp = "<";
@@ -33891,12 +33891,12 @@ var require_subset = __commonJS({
         }
       }
       const eqSet = /* @__PURE__ */ new Set();
-      let gt2, lt3;
+      let gt2, lt2;
       for (const c of sub) {
         if (c.operator === ">" || c.operator === ">=") {
           gt2 = higherGT(gt2, c, options);
         } else if (c.operator === "<" || c.operator === "<=") {
-          lt3 = lowerLT(lt3, c, options);
+          lt2 = lowerLT(lt2, c, options);
         } else {
           eqSet.add(c.semver);
         }
@@ -33905,11 +33905,11 @@ var require_subset = __commonJS({
         return null;
       }
       let gtltComp;
-      if (gt2 && lt3) {
-        gtltComp = compare2(gt2.semver, lt3.semver, options);
+      if (gt2 && lt2) {
+        gtltComp = compare2(gt2.semver, lt2.semver, options);
         if (gtltComp > 0) {
           return null;
-        } else if (gtltComp === 0 && (gt2.operator !== ">=" || lt3.operator !== "<=")) {
+        } else if (gtltComp === 0 && (gt2.operator !== ">=" || lt2.operator !== "<=")) {
           return null;
         }
       }
@@ -33917,7 +33917,7 @@ var require_subset = __commonJS({
         if (gt2 && !satisfies(eq2, String(gt2), options)) {
           return null;
         }
-        if (lt3 && !satisfies(eq2, String(lt3), options)) {
+        if (lt2 && !satisfies(eq2, String(lt2), options)) {
           return null;
         }
         for (const c of dom) {
@@ -33929,9 +33929,9 @@ var require_subset = __commonJS({
       }
       let higher, lower;
       let hasDomLT, hasDomGT;
-      let needDomLTPre = lt3 && !options.includePrerelease && lt3.semver.prerelease.length ? lt3.semver : false;
+      let needDomLTPre = lt2 && !options.includePrerelease && lt2.semver.prerelease.length ? lt2.semver : false;
       let needDomGTPre = gt2 && !options.includePrerelease && gt2.semver.prerelease.length ? gt2.semver : false;
-      if (needDomLTPre && needDomLTPre.prerelease.length === 1 && lt3.operator === "<" && needDomLTPre.prerelease[0] === 0) {
+      if (needDomLTPre && needDomLTPre.prerelease.length === 1 && lt2.operator === "<" && needDomLTPre.prerelease[0] === 0) {
         needDomLTPre = false;
       }
       for (const c of dom) {
@@ -33952,29 +33952,29 @@ var require_subset = __commonJS({
             return false;
           }
         }
-        if (lt3) {
+        if (lt2) {
           if (needDomLTPre) {
             if (c.semver.prerelease && c.semver.prerelease.length && c.semver.major === needDomLTPre.major && c.semver.minor === needDomLTPre.minor && c.semver.patch === needDomLTPre.patch) {
               needDomLTPre = false;
             }
           }
           if (c.operator === "<" || c.operator === "<=") {
-            lower = lowerLT(lt3, c, options);
-            if (lower === c && lower !== lt3) {
+            lower = lowerLT(lt2, c, options);
+            if (lower === c && lower !== lt2) {
               return false;
             }
-          } else if (lt3.operator === "<=" && !satisfies(lt3.semver, String(c), options)) {
+          } else if (lt2.operator === "<=" && !satisfies(lt2.semver, String(c), options)) {
             return false;
           }
         }
-        if (!c.operator && (lt3 || gt2) && gtltComp !== 0) {
+        if (!c.operator && (lt2 || gt2) && gtltComp !== 0) {
           return false;
         }
       }
-      if (gt2 && hasDomLT && !lt3 && gtltComp !== 0) {
+      if (gt2 && hasDomLT && !lt2 && gtltComp !== 0) {
         return false;
       }
-      if (lt3 && hasDomGT && !gt2 && gtltComp !== 0) {
+      if (lt2 && hasDomGT && !gt2 && gtltComp !== 0) {
         return false;
       }
       if (needDomGTPre || needDomLTPre) {
@@ -34024,7 +34024,7 @@ var require_semver2 = __commonJS({
     var sort = require_sort();
     var rsort = require_rsort();
     var gt2 = require_gt();
-    var lt3 = require_lt();
+    var lt2 = require_lt();
     var eq2 = require_eq();
     var neq = require_neq();
     var gte2 = require_gte();
@@ -34062,7 +34062,7 @@ var require_semver2 = __commonJS({
       sort,
       rsort,
       gt: gt2,
-      lt: lt3,
+      lt: lt2,
       eq: eq2,
       neq,
       gte: gte2,
@@ -60470,6 +60470,8 @@ var init_users = __esm({
       assignedShopId: integer("assigned_shop_id"),
       /** Custom permissions, used when role === 'other'. Set by super_admin. */
       permissions: jsonb("permissions").$type(),
+      /** Expo push token for mobile push notifications. Updated by the device on each login. */
+      pushToken: text("push_token"),
       createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
       updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => /* @__PURE__ */ new Date())
     });
@@ -60514,6 +60516,16 @@ var init_restaurants = __esm({
       printerEmail: text("printer_email"),
       /** Set when the owner has filled in the mandatory business details. */
       profileCompletedAt: timestamp("profile_completed_at", { withTimezone: true }),
+      /** Google Places place_id for this restaurant. */
+      googlePlaceId: text("google_place_id"),
+      /** Opening hours from Google Places, stored as JSON (weekday_text array). */
+      openingHours: text("opening_hours"),
+      /** GPS latitude from Google Places. */
+      latitude: real("latitude"),
+      /** GPS longitude from Google Places. */
+      longitude: real("longitude"),
+      /** Website URL from Google Places. */
+      website: text("website"),
       createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
       updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => /* @__PURE__ */ new Date())
     });
@@ -255763,6 +255775,7 @@ var GetOrderResponse = objectType({
   restaurantId: numberType(),
   driverId: numberType().nullish(),
   restaurantName: stringType(),
+  restaurantAddress: stringType().nullish(),
   userName: stringType(),
   status: enumType([
     "pending",
@@ -256241,6 +256254,11 @@ var GetRestaurantResponse = objectType({
   ice: stringType().nullish(),
   printerEmail: stringType().nullish(),
   profileCompletedAt: coerce.date().nullish(),
+  googlePlaceId: stringType().nullish(),
+  openingHours: stringType().nullish(),
+  latitude: numberType().nullish(),
+  longitude: numberType().nullish(),
+  website: stringType().nullish(),
   freeDeliveryThreshold: numberType().optional().describe("Defaulted by the API when not stored on the restaurant row.")
 });
 var UpdateRestaurantParams = objectType({
@@ -256261,7 +256279,12 @@ var UpdateRestaurantBody = objectType({
   deliveryTime: numberType().optional(),
   deliveryFee: numberType().optional(),
   minimumOrder: numberType().optional(),
-  isVerified: booleanType().optional()
+  isVerified: booleanType().optional(),
+  googlePlaceId: stringType().nullish(),
+  openingHours: stringType().nullish(),
+  latitude: numberType().nullish(),
+  longitude: numberType().nullish(),
+  website: stringType().nullish()
 });
 var UpdateRestaurantResponse = objectType({
   id: numberType(),
@@ -256288,6 +256311,11 @@ var UpdateRestaurantResponse = objectType({
   ice: stringType().nullish(),
   printerEmail: stringType().nullish(),
   profileCompletedAt: coerce.date().nullish(),
+  googlePlaceId: stringType().nullish(),
+  openingHours: stringType().nullish(),
+  latitude: numberType().nullish(),
+  longitude: numberType().nullish(),
+  website: stringType().nullish(),
   freeDeliveryThreshold: numberType().optional().describe("Defaulted by the API when not stored on the restaurant row.")
 });
 var DeleteRestaurantParams = objectType({
@@ -256329,6 +256357,18 @@ var CompleteRestaurantProfileResponse = objectType({
   printerEmail: stringType().nullish(),
   profileCompletedAt: coerce.date().nullish(),
   freeDeliveryThreshold: numberType().optional().describe("Defaulted by the API when not stored on the restaurant row.")
+});
+var SyncRestaurantPlacesParams = objectType({
+  id: coerce.number()
+});
+var SyncRestaurantPlacesResponse = objectType({
+  id: numberType(),
+  googlePlaceId: stringType().nullish(),
+  openingHours: stringType().nullish(),
+  latitude: numberType().nullish(),
+  longitude: numberType().nullish(),
+  website: stringType().nullish(),
+  phone: stringType().nullish()
 });
 var GetRestaurantStatsParams = objectType({
   id: coerce.number()
@@ -259843,6 +259883,38 @@ function calculateETA(fromLat, fromLng, toLat, toLng, speedKmh = AVG_DRIVER_SPEE
 var import_express5 = __toESM(require_express2(), 1);
 init_src();
 init_drizzle_orm();
+
+// src/lib/expoPush.ts
+var EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+function isValidExpoToken(token) {
+  return typeof token === "string" && (token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken["));
+}
+async function sendExpoPush(messages) {
+  const valid = messages.filter((m) => isValidExpoToken(m.to));
+  if (valid.length === 0) return;
+  for (let i = 0; i < valid.length; i += 100) {
+    const batch = valid.slice(i, i + 100);
+    try {
+      const res = await fetch(EXPO_PUSH_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          "Accept-Encoding": "gzip, deflate"
+        },
+        body: JSON.stringify(batch)
+      });
+      if (!res.ok) {
+        const text2 = await res.text().catch(() => "");
+        console.error("[expoPush] Expo API error:", res.status, text2);
+      }
+    } catch (e) {
+      console.error("[expoPush] fetch failed:", e);
+    }
+  }
+}
+
+// src/routes/notifications.ts
 var router5 = (0, import_express5.Router)();
 router5.get("/notifications", requireAuth, async (req, res) => {
   const notifications = await db.select().from(notificationsTable).where(eq(notificationsTable.userId, req.userId)).orderBy(desc(notificationsTable.createdAt)).limit(50);
@@ -259875,10 +259947,34 @@ router5.delete("/notifications/:id", requireAuth, async (req, res) => {
   await db.delete(notificationsTable).where(and(eq(notificationsTable.id, id), eq(notificationsTable.userId, req.userId)));
   res.json({ success: true });
 });
+router5.put("/push-token", requireAuth, async (req, res) => {
+  const token = typeof req.body?.token === "string" ? req.body.token.trim() : null;
+  if (!token) {
+    res.status(400).json({ error: "token is required" });
+    return;
+  }
+  if (!token.startsWith("ExponentPushToken[") && !token.startsWith("ExpoPushToken[")) {
+    res.status(400).json({ error: "Invalid Expo push token format" });
+    return;
+  }
+  await db.update(usersTable).set({ pushToken: token }).where(eq(usersTable.id, req.userId));
+  res.json({ ok: true });
+});
 var notifications_default = router5;
 async function pushNotification(userId, type, title, body, data) {
   try {
     await db.insert(notificationsTable).values({ userId, type, title, body, data: data ?? null });
+    const [user] = await db.select({ pushToken: usersTable.pushToken }).from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (user?.pushToken) {
+      await sendExpoPush([{
+        to: user.pushToken,
+        title,
+        body,
+        data,
+        sound: "default",
+        priority: "high"
+      }]);
+    }
   } catch (e) {
     console.error("[notifications] push failed", e);
   }
@@ -259886,6 +259982,25 @@ async function pushNotification(userId, type, title, body, data) {
 
 // src/routes/orders.ts
 var router6 = (0, import_express6.Router)();
+async function notifyAvailableDrivers(orderId, restaurantName, deliveryAddress, total) {
+  try {
+    const rows = await db.select({ pushToken: usersTable.pushToken }).from(driversTable).innerJoin(usersTable, eq(driversTable.userId, usersTable.id)).where(and(eq(driversTable.isAvailable, true), isNotNull(usersTable.pushToken)));
+    const tokens = rows.map((r) => r.pushToken).filter(Boolean);
+    if (tokens.length === 0) return;
+    await sendExpoPush(
+      tokens.map((to) => ({
+        to,
+        title: "\u{1F4E6} Nouvelle livraison disponible",
+        body: `${restaurantName} \u2192 ${deliveryAddress.split(",")[0]} \u2014 ${total.toFixed(0)} DH`,
+        data: { orderId },
+        sound: "default",
+        priority: "high"
+      }))
+    );
+  } catch (e) {
+    console.error("[orders] notifyAvailableDrivers failed:", e);
+  }
+}
 async function getOrderWithItems(orderId) {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
   if (!order) return null;
@@ -260058,7 +260173,9 @@ router6.post("/orders", requireAuth, async (req, res) => {
   }
   const orderWithItems = await getOrderWithItems(order.id);
   publish(`restaurant:${restaurantId}`, "order_new", orderWithItems);
+  publish("admin_tracking", "order_new", { orderId: order.id, restaurantName: restaurant.name, total, userId, reference: order.reference });
   await pushNotification(userId, "order_status", "Commande re\xE7ue !", `Votre commande chez ${restaurant.name} a bien \xE9t\xE9 re\xE7ue.`, { orderId: order.id, status: "pending" });
+  await pushNotification(restaurant.ownerId, "order_new", "\u{1F6CE} Nouvelle commande", `Commande #${order.reference ?? order.id} \u2014 ${total.toFixed(0)} DH de ${user?.name ?? "un client"}`, { orderId: order.id });
   res.status(201).json(orderWithItems);
 });
 router6.get("/orders/:id", attachAuth, async (req, res) => {
@@ -260153,9 +260270,25 @@ router6.patch("/orders/:id/status", requireAuth, async (req, res) => {
   publish("admin_tracking", "order_status", { orderId: order.id, status: order.status, driverId: order.driverId });
   if (parsed.data.status === "ready") {
     publish("available_orders", "order_ready", { orderId: order.id, restaurantName: order.restaurantName, deliveryAddress: order.deliveryAddress, total: order.total });
+    notifyAvailableDrivers(order.id, order.restaurantName, order.deliveryAddress, order.total).catch(() => {
+    });
   }
   if (parsed.data.driverId) {
     publish(`driver_orders:${parsed.data.driverId}`, "order_assigned", { orderId: order.id, order: orderWithItems });
+    const [assignedDriver] = await db.select({ userId: driversTable.userId }).from(driversTable).where(eq(driversTable.id, parsed.data.driverId)).limit(1);
+    if (assignedDriver) {
+      await pushNotification(assignedDriver.userId, "order_assigned", "\u{1F680} Commande attribu\xE9e", `R\xE9cup\xE9rez la commande #${order.reference ?? order.id} chez ${order.restaurantName}`, { orderId: order.id });
+    }
+  }
+  const customerMessages = {
+    accepted: { title: "\u2705 Commande accept\xE9e", body: `Votre commande chez ${order.restaurantName} a \xE9t\xE9 confirm\xE9e !` },
+    preparing: { title: "\u{1F468}\u200D\u{1F373} En pr\xE9paration", body: `Votre commande chez ${order.restaurantName} est en cours de pr\xE9paration.` },
+    en_route: { title: "\u{1F6F5} En route !", body: `Votre livreur est en chemin avec votre commande de ${order.restaurantName}.` },
+    cancelled: { title: "\u274C Commande annul\xE9e", body: `Votre commande chez ${order.restaurantName} a \xE9t\xE9 annul\xE9e.` }
+  };
+  const custMsg = customerMessages[order.status];
+  if (custMsg) {
+    await pushNotification(order.userId, "order_status", custMsg.title, custMsg.body, { orderId: order.id, status: order.status });
   }
   if (parsed.data.status === "en_route" && order.driverId) {
     attachOrder(order.driverId, order.id);
@@ -260238,6 +260371,7 @@ router6.post("/orders/:id/accept-delivery", requireAuth, async (req, res) => {
   publish(`order:${orderId}`, "order_status", { orderId, status: "picked_up", driverName: driver.name, order: orderWithItems });
   publish(`restaurant:${order.restaurantId}`, "order_status", { orderId, status: "picked_up", driverName: driver.name });
   publish("admin_tracking", "order_status", { orderId, status: "picked_up", driverId, driverName: driver.name });
+  await pushNotification(order.userId, "order_status", "\u{1F6F5} En route !", `${driver.name} est en chemin avec votre commande de ${order.restaurantName}.`, { orderId, status: "picked_up" });
   attachOrder(driverId, orderId);
   res.json(orderWithItems);
 });

@@ -15,7 +15,7 @@ import {
   promoCodeUsagesTable,
   referralsTable,
 } from "@workspace/db";
-import { eq, and, inArray, isNull } from "drizzle-orm";
+import { eq, and, inArray, isNull, isNotNull } from "drizzle-orm";
 import { requireAuth, attachAuth, type AuthedRequest } from "../middlewares/auth";
 import {
   CreateOrderBody,
@@ -27,8 +27,36 @@ import {
 import { publish } from "../lib/sse";
 import * as tracking from "../lib/trackingService";
 import { pushNotification } from "./notifications";
+import { sendExpoPush } from "../lib/expoPush";
 
 const router: IRouter = Router();
+
+/** Send push notifications to all currently available drivers. */
+async function notifyAvailableDrivers(orderId: number, restaurantName: string, deliveryAddress: string, total: number): Promise<void> {
+  try {
+    const rows = await db
+      .select({ pushToken: usersTable.pushToken })
+      .from(driversTable)
+      .innerJoin(usersTable, eq(driversTable.userId, usersTable.id))
+      .where(and(eq(driversTable.isAvailable, true), isNotNull(usersTable.pushToken)));
+
+    const tokens = rows.map((r) => r.pushToken).filter(Boolean) as string[];
+    if (tokens.length === 0) return;
+
+    await sendExpoPush(
+      tokens.map((to) => ({
+        to,
+        title: "📦 Nouvelle livraison disponible",
+        body: `${restaurantName} → ${deliveryAddress.split(",")[0]} — ${total.toFixed(0)} DH`,
+        data: { orderId },
+        sound: "default" as const,
+        priority: "high" as const,
+      })),
+    );
+  } catch (e) {
+    console.error("[orders] notifyAvailableDrivers failed:", e);
+  }
+}
 
 async function getOrderWithItems(orderId: number) {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
@@ -262,11 +290,14 @@ router.post("/orders", requireAuth, async (req: AuthedRequest, res): Promise<voi
 
   const orderWithItems = await getOrderWithItems(order.id);
 
-  // Push real-time event to restaurant
+  // Push real-time events
   publish(`restaurant:${restaurantId}`, "order_new", orderWithItems);
+  publish("admin_tracking", "order_new", { orderId: order.id, restaurantName: restaurant.name, total, userId, reference: order.reference });
 
   // Push notification to customer
   await pushNotification(userId, "order_status", "Commande reçue !", `Votre commande chez ${restaurant.name} a bien été reçue.`, { orderId: order.id, status: "pending" });
+  // Push notification to restaurant owner
+  await pushNotification(restaurant.ownerId, "order_new", "🛎 Nouvelle commande", `Commande #${order.reference ?? order.id} — ${total.toFixed(0)} DH de ${user?.name ?? "un client"}`, { orderId: order.id });
 
   res.status(201).json(orderWithItems);
 });
@@ -389,14 +420,32 @@ router.patch("/orders/:id/status", requireAuth, async (req: AuthedRequest, res):
   // Admin tracking dashboard sees every status change for live ops visibility.
   publish("admin_tracking", "order_status", { orderId: order.id, status: order.status, driverId: order.driverId });
 
-  // When order is ready, notify available drivers
+  // When order is ready, notify available drivers (SSE + push)
   if (parsed.data.status === "ready") {
     publish("available_orders", "order_ready", { orderId: order.id, restaurantName: order.restaurantName, deliveryAddress: order.deliveryAddress, total: order.total });
+    notifyAvailableDrivers(order.id, order.restaurantName, order.deliveryAddress, order.total).catch(() => {});
   }
 
-  // When order is assigned to a driver, push to that driver's channel
+  // When order is assigned to a driver, push to that driver's channel + send push
   if (parsed.data.driverId) {
     publish(`driver_orders:${parsed.data.driverId}`, "order_assigned", { orderId: order.id, order: orderWithItems });
+    // Look up driver's userId to send push notification
+    const [assignedDriver] = await db.select({ userId: driversTable.userId }).from(driversTable).where(eq(driversTable.id, parsed.data.driverId)).limit(1);
+    if (assignedDriver) {
+      await pushNotification(assignedDriver.userId, "order_assigned", "🚀 Commande attribuée", `Récupérez la commande #${order.reference ?? order.id} chez ${order.restaurantName}`, { orderId: order.id });
+    }
+  }
+
+  // Status-based push notification to customer
+  const customerMessages: Record<string, { title: string; body: string }> = {
+    accepted: { title: "✅ Commande acceptée", body: `Votre commande chez ${order.restaurantName} a été confirmée !` },
+    preparing: { title: "👨‍🍳 En préparation", body: `Votre commande chez ${order.restaurantName} est en cours de préparation.` },
+    en_route: { title: "🛵 En route !", body: `Votre livreur est en chemin avec votre commande de ${order.restaurantName}.` },
+    cancelled: { title: "❌ Commande annulée", body: `Votre commande chez ${order.restaurantName} a été annulée.` },
+  };
+  const custMsg = customerMessages[order.status];
+  if (custMsg) {
+    await pushNotification(order.userId, "order_status", custMsg.title, custMsg.body, { orderId: order.id, status: order.status });
   }
 
   // When the driver hits the road, attach the order to their live tracking
@@ -506,6 +555,9 @@ router.post("/orders/:id/accept-delivery", requireAuth, async (req: AuthedReques
   publish(`order:${orderId}`, "order_status", { orderId, status: "picked_up", driverName: driver.name, order: orderWithItems });
   publish(`restaurant:${order.restaurantId}`, "order_status", { orderId, status: "picked_up", driverName: driver.name });
   publish("admin_tracking", "order_status", { orderId, status: "picked_up", driverId, driverName: driver.name });
+
+  // Push notification to customer: driver is on the way
+  await pushNotification(order.userId, "order_status", "🛵 En route !", `${driver.name} est en chemin avec votre commande de ${order.restaurantName}.`, { orderId, status: "picked_up" });
 
   // Start tracking the order in the in-memory live state so subsequent driver
   // location pings get fanned out on the order:{id} channel.

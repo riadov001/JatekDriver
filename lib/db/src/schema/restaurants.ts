@@ -32,6 +32,16 @@ export const restaurantsTable = pgTable("restaurants", {
   printerEmail: text("printer_email"),
   /** Set when the owner has filled in the mandatory business details. */
   profileCompletedAt: timestamp("profile_completed_at", { withTimezone: true }),
+  /** Google Places place_id for this restaurant. */
+  googlePlaceId: text("google_place_id"),
+  /** Opening hours from Google Places, stored as JSON (weekday_text array). */
+  openingHours: text("opening_hours"),
+  /** GPS latitude from Google Places. */
+  latitude: real("latitude"),
+  /** GPS longitude from Google Places. */
+  longitude: real("longitude"),
+  /** Website URL from Google Places. */
+  website: text("website"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

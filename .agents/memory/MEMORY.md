@@ -1,0 +1,1 @@
+- [Push notification architecture](push-notifications.md) — Expo Push API called from backend (ma.jatek.app); pushToken stored on usersTable; PUT /api/push-token to register.

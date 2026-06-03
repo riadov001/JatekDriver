@@ -34,6 +34,8 @@ export const usersTable = pgTable("users", {
   assignedShopId: integer("assigned_shop_id"),
   /** Custom permissions, used when role === 'other'. Set by super_admin. */
   permissions: jsonb("permissions").$type<CustomPermissions>(),
+  /** Expo push token for mobile push notifications. Updated by the device on each login. */
+  pushToken: text("push_token"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

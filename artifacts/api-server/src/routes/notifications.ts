@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { db, notificationsTable } from "@workspace/db";
-import { eq, and, isNull, desc, lt } from "drizzle-orm";
+import { db, notificationsTable, usersTable } from "@workspace/db";
+import { eq, and, isNull, desc } from "drizzle-orm";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
+import { sendExpoPush } from "../lib/expoPush";
 
 const router: IRouter = Router();
 
@@ -53,9 +54,36 @@ router.delete("/notifications/:id", requireAuth, async (req: AuthedRequest, res)
   res.json({ success: true });
 });
 
+/**
+ * Register or update the Expo push token for the current user's device.
+ * The mobile app calls this on each login/launch after obtaining the token.
+ */
+router.put("/push-token", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
+  const token = typeof req.body?.token === "string" ? req.body.token.trim() : null;
+  if (!token) {
+    res.status(400).json({ error: "token is required" });
+    return;
+  }
+  if (!token.startsWith("ExponentPushToken[") && !token.startsWith("ExpoPushToken[")) {
+    res.status(400).json({ error: "Invalid Expo push token format" });
+    return;
+  }
+
+  await db
+    .update(usersTable)
+    .set({ pushToken: token })
+    .where(eq(usersTable.id, req.userId!));
+
+  res.json({ ok: true });
+});
+
 export default router;
 
-/** Helper used by other routes to push a notification to a user */
+/**
+ * Insert an in-app notification row and, if the user has a registered
+ * device token, also deliver an Expo push notification.
+ * Never throws — failures are logged silently.
+ */
 export async function pushNotification(
   userId: number,
   type: string,
@@ -65,6 +93,23 @@ export async function pushNotification(
 ) {
   try {
     await db.insert(notificationsTable).values({ userId, type, title, body, data: data ?? null });
+
+    const [user] = await db
+      .select({ pushToken: usersTable.pushToken })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    if (user?.pushToken) {
+      await sendExpoPush([{
+        to: user.pushToken,
+        title,
+        body,
+        data,
+        sound: "default",
+        priority: "high",
+      }]);
+    }
   } catch (e) {
     console.error("[notifications] push failed", e);
   }

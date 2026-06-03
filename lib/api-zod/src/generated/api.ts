@@ -1487,6 +1487,7 @@ export const GetOrderResponse = zod.object({
   restaurantId: zod.number(),
   driverId: zod.number().nullish(),
   restaurantName: zod.string(),
+  restaurantAddress: zod.string().nullish(),
   userName: zod.string(),
   status: zod.enum([
     "pending",
@@ -2086,6 +2087,11 @@ export const GetRestaurantResponse = zod.object({
   ice: zod.string().nullish(),
   printerEmail: zod.string().nullish(),
   profileCompletedAt: zod.coerce.date().nullish(),
+  googlePlaceId: zod.string().nullish(),
+  openingHours: zod.string().nullish(),
+  latitude: zod.number().nullish(),
+  longitude: zod.number().nullish(),
+  website: zod.string().nullish(),
   freeDeliveryThreshold: zod
     .number()
     .optional()
@@ -2116,6 +2122,11 @@ export const UpdateRestaurantBody = zod.object({
   deliveryFee: zod.number().optional(),
   minimumOrder: zod.number().optional(),
   isVerified: zod.boolean().optional(),
+  googlePlaceId: zod.string().nullish(),
+  openingHours: zod.string().nullish(),
+  latitude: zod.number().nullish(),
+  longitude: zod.number().nullish(),
+  website: zod.string().nullish(),
 });
 
 export const UpdateRestaurantResponse = zod.object({
@@ -2143,6 +2154,11 @@ export const UpdateRestaurantResponse = zod.object({
   ice: zod.string().nullish(),
   printerEmail: zod.string().nullish(),
   profileCompletedAt: zod.coerce.date().nullish(),
+  googlePlaceId: zod.string().nullish(),
+  openingHours: zod.string().nullish(),
+  latitude: zod.number().nullish(),
+  longitude: zod.number().nullish(),
+  website: zod.string().nullish(),
   freeDeliveryThreshold: zod
     .number()
     .optional()
@@ -2209,6 +2225,20 @@ export const CompleteRestaurantProfileResponse = zod.object({
 /**
  * @summary Get restaurant statistics
  */
+export const SyncRestaurantPlacesParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SyncRestaurantPlacesResponse = zod.object({
+  id: zod.number(),
+  googlePlaceId: zod.string().nullish(),
+  openingHours: zod.string().nullish(),
+  latitude: zod.number().nullish(),
+  longitude: zod.number().nullish(),
+  website: zod.string().nullish(),
+  phone: zod.string().nullish(),
+});
+
 export const GetRestaurantStatsParams = zod.object({
   id: zod.coerce.number(),
 });

@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "expo-local-authentication": "^55.0.13",
+    "expo-notifications": "^56.0.15",
     "expo-secure-store": "^15.0.8",
     "react-native-maps": "1.18.0"
   }
