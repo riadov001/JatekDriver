@@ -1,5 +1,4 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "J99iUkGb0IWfcaAnYwkyG"
@@ -18,3 +17,9 @@ id = "XnWuoC04mEk2dua8biQQi"
 uri = "file://artifacts/marchand/assets/images/icon.png"
 type = "image"
 title = "jatek marchand icon"
+
+[[outputs]]
+id = "guAgkGtz2Ahusy5A7nNUx"
+uri = "file://plan-taches-jatek-livreur.md"
+type = "text"
+title = "Plan des tâches — Jatek Livreur"
