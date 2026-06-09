@@ -114,17 +114,20 @@ export default function LoginScreen() {
     } catch (e: unknown) {
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       const msg = e instanceof Error ? e.message : "Échec de la connexion";
+      const msgLow = msg.toLowerCase();
       let friendly = "Échec de la connexion. Réessayez.";
-      if (msg.includes("401") || msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("invalid")) {
-        friendly = "Email ou mot de passe incorrect";
-      } else if (msg.toLowerCase().includes("livreur")) {
-        friendly = "Ce compte n'est pas un compte livreur. Utilisez uniquement un compte livreur.";
-      } else if (msg.toLowerCase().includes("network") || msg.toLowerCase().includes("fetch") || msg.toLowerCase().includes("failed to fetch")) {
-        friendly = "Impossible de joindre le serveur. Vérifiez votre connexion internet.";
-      } else if (msg.includes("<!") || msg.toLowerCase().includes("parse") || msg.toLowerCase().includes("json")) {
-        friendly = "Erreur de connexion au serveur. Réessayez dans quelques instants.";
-      } else if (msg.toLowerCase().includes("disabled") || msg.toLowerCase().includes("désactivé")) {
+      if (msgLow.includes("pending") || msgLow.includes("attente") || msgLow.includes("validat") || msgLow.includes("not approved") || msgLow.includes("not activated")) {
+        friendly = "Votre compte est en attente de validation par un administrateur. Revenez une fois votre compte activé.";
+      } else if (msgLow.includes("disabled") || msgLow.includes("désactivé") || msgLow.includes("blocked") || msgLow.includes("bloqué")) {
         friendly = "Ce compte est désactivé. Contactez l'administrateur.";
+      } else if (msg.includes("401") || msgLow.includes("unauthorized") || msgLow.includes("invalid") || msgLow.includes("incorrect") || msgLow.includes("wrong")) {
+        friendly = "Email ou mot de passe incorrect";
+      } else if (msgLow.includes("livreur")) {
+        friendly = "Ce compte n'est pas un compte livreur. Utilisez uniquement un compte livreur.";
+      } else if (msgLow.includes("network") || msgLow.includes("fetch") || msgLow.includes("failed to fetch")) {
+        friendly = "Impossible de joindre le serveur. Vérifiez votre connexion internet.";
+      } else if (msg.includes("<!") || msgLow.includes("parse") || msgLow.includes("json")) {
+        friendly = "Erreur de connexion au serveur. Réessayez dans quelques instants.";
       }
       setError(friendly);
     } finally {
@@ -244,6 +247,15 @@ export default function LoginScreen() {
               )}
             </Pressable>
           )}
+
+          <View style={styles.registerRow}>
+            <Text style={[styles.registerLabel, { color: colors.mutedForeground }]}>
+              Pas encore de compte ?
+            </Text>
+            <Pressable onPress={() => router.push("/register")} hitSlop={8}>
+              <Text style={[styles.registerLink, { color: colors.primary }]}>S'inscrire</Text>
+            </Pressable>
+          </View>
         </View>
       </KeyboardAwareScrollViewCompat>
     </View>
@@ -290,4 +302,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   biometricText: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  registerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  registerLabel: { fontFamily: "Inter_400Regular", fontSize: 14 },
+  registerLink: { fontFamily: "Inter_700Bold", fontSize: 14 },
 });
