@@ -1,4 +1,3 @@
-import Constants from "expo-constants";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface LatLng {
@@ -19,8 +18,7 @@ interface DirectionsResult {
 
 const geocodeCache = new Map<string, LatLng | null>();
 
-const API_KEY: string =
-  (Constants.expoConfig?.extra?.googleMapsApiKey as string) ?? "";
+const API_KEY: string = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
 async function geocodeAddress(address: string): Promise<LatLng | null> {
   if (geocodeCache.has(address)) return geocodeCache.get(address)!;

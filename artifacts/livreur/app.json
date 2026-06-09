@@ -46,6 +46,13 @@
       "expo-web-browser",
       "expo-local-authentication",
       [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permet de partager votre position en temps réel pendant les livraisons.",
+          "locationWhenInUsePermission": "Permet de partager votre position en temps réel pendant les livraisons."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",
@@ -62,7 +69,8 @@
     "extra": {
       "eas": {
         "projectId": "3bf3e2da-2317-4261-b2a4-d0a62426be7e"
-      }
+      },
+      "googleMapsApiKey": ""
     }
   }
 }
