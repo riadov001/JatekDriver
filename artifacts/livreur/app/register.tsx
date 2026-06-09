@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { Logo } from "@/components/Logo";
 import { useColors } from "@/hooks/useColors";
-import { customFetch, type AuthResponse } from "@workspace/api-client-react";
+import { customFetch } from "@workspace/api-client-react";
 
 export default function RegisterScreen() {
   const colors = useColors();
@@ -63,7 +63,7 @@ export default function RegisterScreen() {
     setError(null);
     setLoading(true);
     try {
-      await customFetch<AuthResponse>("/api/auth/register", {
+      await customFetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -259,6 +259,8 @@ export default function RegisterScreen() {
   );
 }
 
+type Colors = ReturnType<typeof useColors>;
+
 function Field({
   label,
   icon,
@@ -268,7 +270,7 @@ function Field({
 }: {
   label: string;
   icon: keyof typeof Feather.glyphMap;
-  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+  colors: Colors;
   children: React.ReactNode;
   suffix?: React.ReactNode;
 }) {

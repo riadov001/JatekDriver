@@ -12,6 +12,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Logo } from "@/components/Logo";
 import { useColors } from "@/hooks/useColors";
 
+type Colors = ReturnType<typeof useColors>;
+
 export default function PendingValidationScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -106,7 +108,7 @@ function Step({
   label: string;
   done?: boolean;
   pending?: boolean;
-  colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+  colors: Colors;
 }) {
   const tint = done ? colors.success : pending ? colors.warning : colors.mutedForeground;
   return (

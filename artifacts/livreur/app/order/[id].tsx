@@ -7,7 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -94,7 +94,7 @@ export default function OrderDetailScreen() {
   );
 
   // Auto-follow driver on map
-  useMemo(() => {
+  useEffect(() => {
     if (followDriver && coords && mapRef.current && Platform.OS !== "web") {
       mapRef.current.animateToRegion(
         { latitude: coords.latitude, longitude: coords.longitude, latitudeDelta: 0.012, longitudeDelta: 0.012 },

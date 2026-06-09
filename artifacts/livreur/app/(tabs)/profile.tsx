@@ -65,11 +65,12 @@ export default function ProfileScreen() {
     }
   };
 
-  const initials = (driver?.name ?? user?.name ?? "??")
+  const fullName: string = driver?.name ?? user?.name ?? "??";
+  const initials: string = fullName
     .split(" ")
-    .filter(Boolean)
+    .filter((w: string) => w.length > 0)
     .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase() ?? "")
+    .map((w: string) => w[0].toUpperCase())
     .join("");
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
