@@ -49,7 +49,7 @@ export default function Reviews() {
                 <TableRow key={review.id}>
                   <TableCell className="text-sm whitespace-nowrap">{format(new Date(review.createdAt), "dd MMM yyyy")}</TableCell>
                   <TableCell className="font-medium">{review.userName}</TableCell>
-                  <TableCell>#{review.restaurantId}</TableCell>
+                  <TableCell>{(review as any).restaurantName ?? `#${review.restaurantId}`}</TableCell>
                   <TableCell>
                     <div className="flex items-center">
                       {Array.from({ length: 5 }).map((_, i) => (

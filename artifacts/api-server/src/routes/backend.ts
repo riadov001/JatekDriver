@@ -663,7 +663,23 @@ router.get("/backend/reviews", requireAuth, async (req: AuthedRequest, res): Pro
   }
   if (req.query.shopId) conds.push(eq(reviewsTable.restaurantId, Number(req.query.shopId)));
   const where = conds.length ? and(...conds) : undefined;
-  const rows = await db.select().from(reviewsTable).where(where).orderBy(desc(reviewsTable.createdAt)).limit(200);
+  const rows = await db
+    .select({
+      id: reviewsTable.id,
+      userId: reviewsTable.userId,
+      restaurantId: reviewsTable.restaurantId,
+      restaurantName: restaurantsTable.name,
+      orderId: reviewsTable.orderId,
+      userName: reviewsTable.userName,
+      rating: reviewsTable.rating,
+      comment: reviewsTable.comment,
+      createdAt: reviewsTable.createdAt,
+    })
+    .from(reviewsTable)
+    .leftJoin(restaurantsTable, eq(reviewsTable.restaurantId, restaurantsTable.id))
+    .where(where)
+    .orderBy(desc(reviewsTable.createdAt))
+    .limit(200);
   res.json(rows);
 });
 

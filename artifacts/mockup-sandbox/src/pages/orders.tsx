@@ -1,17 +1,11 @@
 import { useState } from "react";
 import { useListBackendOrders, useUpdateOrderStatus, getListBackendOrdersQueryKey, Order, UpdateOrderStatusBodyStatus } from "@workspace/api-client-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-
-type OrderWithItems = Order & { items: Array<{ id: number; quantity: number; menuItemName: string; totalPrice: number }> };
-
-async function fetchOrderDetail(id: number): Promise<OrderWithItems> {
-  const res = await fetch(`/api/backend/orders/${id}`, { credentials: "include" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
+import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+
 import { 
   Table,
   TableBody,
@@ -34,6 +28,12 @@ import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+type OrderWithItems = Order & { items: Array<{ id: number; quantity: number; menuItemName: string; totalPrice: number }> };
+
+async function fetchOrderDetail(id: number): Promise<OrderWithItems> {
+  return apiFetch<OrderWithItems>(`/api/backend/orders/${id}`);
+}
 
 export default function Orders() {
   const [search, setSearch] = useState("");

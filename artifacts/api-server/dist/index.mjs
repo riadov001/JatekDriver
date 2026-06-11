@@ -262639,7 +262639,17 @@ router19.get("/backend/reviews", requireAuth, async (req, res) => {
   }
   if (req.query.shopId) conds.push(eq(reviewsTable.restaurantId, Number(req.query.shopId)));
   const where = conds.length ? and(...conds) : void 0;
-  const rows = await db.select().from(reviewsTable).where(where).orderBy(desc(reviewsTable.createdAt)).limit(200);
+  const rows = await db.select({
+    id: reviewsTable.id,
+    userId: reviewsTable.userId,
+    restaurantId: reviewsTable.restaurantId,
+    restaurantName: restaurantsTable.name,
+    orderId: reviewsTable.orderId,
+    userName: reviewsTable.userName,
+    rating: reviewsTable.rating,
+    comment: reviewsTable.comment,
+    createdAt: reviewsTable.createdAt
+  }).from(reviewsTable).leftJoin(restaurantsTable, eq(reviewsTable.restaurantId, restaurantsTable.id)).where(where).orderBy(desc(reviewsTable.createdAt)).limit(200);
   res.json(rows);
 });
 router19.get("/backend/categories", requireAuth, async (req, res) => {
