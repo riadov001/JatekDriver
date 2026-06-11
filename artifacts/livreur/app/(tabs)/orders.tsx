@@ -118,7 +118,7 @@ export default function OrdersScreen() {
             tintColor={colors.primary}
           />
         }
-        scrollEnabled={filtered.length > 0}
+        scrollEnabled
         ListEmptyComponent={
           ordersQuery.isError ? (
             <View style={styles.errorState}>

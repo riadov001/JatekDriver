@@ -143,10 +143,19 @@ function ClassicTabLayout() {
 export default function TabLayout() {
   let nativeAvailable = false;
   try {
-    nativeAvailable = isLiquidGlassAvailable();
+    nativeAvailable =
+      Platform.OS === "ios" && typeof isLiquidGlassAvailable === "function"
+        ? isLiquidGlassAvailable()
+        : false;
   } catch {
     nativeAvailable = false;
   }
-  if (nativeAvailable) return <NativeTabLayout />;
+  if (nativeAvailable) {
+    try {
+      return <NativeTabLayout />;
+    } catch {
+      // fall through to classic layout
+    }
+  }
   return <ClassicTabLayout />;
 }

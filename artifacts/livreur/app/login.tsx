@@ -69,6 +69,12 @@ export default function LoginScreen() {
         return;
       }
       await hydrate();
+      // Check that hydration actually produced a valid token
+      const storedToken = await storage.getItemAsync(TOKEN_KEY);
+      if (!storedToken) {
+        setError("Session expirée. Reconnectez-vous avec votre mot de passe.");
+        return;
+      }
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       router.replace("/(tabs)");
     } catch {

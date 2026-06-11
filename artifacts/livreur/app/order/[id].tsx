@@ -138,8 +138,8 @@ export default function OrderDetailScreen() {
 
   const handleConfirmDelivery = () => {
     const code = otpValue.trim();
-    if (!/^\d{4,6}$/.test(code)) {
-      Alert.alert("Code invalide", "Entrez le code à 4–6 chiffres affiché sur le téléphone du client.");
+    if (!/^\d{4}$/.test(code)) {
+      Alert.alert("Code invalide", "Entrez le code à 4 chiffres affiché sur le téléphone du client.");
       return;
     }
     confirmDelivery.mutate({ id: orderId, data: { pickupCode: code } });
@@ -507,7 +507,7 @@ export default function OrderDetailScreen() {
             Code de confirmation
           </Text>
           <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
-            Demandez le code OTP affiché sur le téléphone du client et saisissez-le ci-dessous.
+            Demandez le code à 4 chiffres affiché sur le téléphone du client et saisissez-le ci-dessous.
           </Text>
 
           <TextInput
@@ -523,10 +523,10 @@ export default function OrderDetailScreen() {
             ]}
             value={otpValue}
             onChangeText={setOtpValue}
-            placeholder="• • • • • •"
+            placeholder="• • • •"
             placeholderTextColor={colors.mutedForeground}
             keyboardType="number-pad"
-            maxLength={6}
+            maxLength={4}
             textAlign="center"
             returnKeyType="done"
             onSubmitEditing={handleConfirmDelivery}
