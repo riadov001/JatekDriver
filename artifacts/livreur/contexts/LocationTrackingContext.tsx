@@ -179,8 +179,13 @@ export function LocationTrackingProvider({ children }: { children: ReactNode }) 
 
         if (next) {
           // Block go-online if the driver's profile is not yet complete.
-          const currentDriver = await refreshDriver();
-          if (!currentDriver?.profileCompletedAt) {
+          // Prefer a fresh fetch; fall back to the cached driver from context
+          // so transient network errors don't produce a false "profil incomplet".
+          const freshDriver = await refreshDriver();
+          const profileDone = freshDriver
+            ? !!freshDriver.profileCompletedAt
+            : !!driver?.profileCompletedAt;
+          if (!profileDone) {
             Alert.alert(
               "Profil incomplet",
               "Veuillez compléter votre profil avant de passer en ligne.",
