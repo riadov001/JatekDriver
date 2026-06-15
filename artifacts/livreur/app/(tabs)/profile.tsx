@@ -44,7 +44,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, driver, logout } = useAuth();
-  const { setOnline } = useLocationTracking();
+  const { online, setOnline } = useLocationTracking();
 
   const handleLogout = () => {
     const doLogout = async () => {
@@ -107,7 +107,7 @@ export default function ProfileScreen() {
           <View style={styles.badgeRow}>
             <View style={[styles.badge, { backgroundColor: colors.primary + "33" }]}>
               <Text style={[styles.badgeText, { color: colors.primary }]}>
-                {driver?.isAvailable ? "En ligne" : "Hors ligne"}
+                {online ? "En ligne" : "Hors ligne"}
               </Text>
             </View>
             {driver?.rating != null ? (

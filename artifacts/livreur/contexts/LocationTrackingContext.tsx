@@ -178,6 +178,16 @@ export function LocationTrackingProvider({ children }: { children: ReactNode }) 
         }
 
         if (next) {
+          // Block go-online if the driver's profile is not yet complete.
+          const currentDriver = await refreshDriver();
+          if (!currentDriver?.profileCompletedAt) {
+            Alert.alert(
+              "Profil incomplet",
+              "Veuillez compléter votre profil avant de passer en ligne.",
+            );
+            return;
+          }
+
           const ok = await requestPermission();
           if (!ok) {
             setOnlineState(false);
