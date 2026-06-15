@@ -171,6 +171,9 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
     },
   );
 
+  let metroExited = false;
+  let metroExitCode = null;
+
   if (metroProcess.stdout) {
     metroProcess.stdout.on("data", (data) => {
       const output = data.toString().trim();
@@ -183,9 +186,21 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
       if (output) console.error(`[Metro Error] ${output}`);
     });
   }
+  metroProcess.on("exit", (code) => {
+    metroExited = true;
+    metroExitCode = code;
+  });
 
-  for (let i = 0; i < 60; i++) {
+  // Allow up to 3 minutes for Metro to start — production build environments
+  // are slower than dev (cold start, React Compiler, no cache).
+  const maxAttempts = 180;
+  for (let i = 0; i < maxAttempts; i++) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    if (metroExited) {
+      console.error(`Metro process exited early (code ${metroExitCode})`);
+      process.exit(1);
+    }
 
     const healthy = await checkMetroHealth();
     if (healthy) {
@@ -194,7 +209,7 @@ async function startMetro(expoPublicDomain, expoPublicReplId) {
     }
   }
 
-  console.error("Metro timeout");
+  console.error(`Metro timeout after ${maxAttempts}s`);
   process.exit(1);
 }
 
