@@ -128,18 +128,14 @@ async function checkMetroHealth() {
       console.log(`[Metro Health] status=${response.status} (not ok)`);
       return false;
     }
-    // Vite (mockup-sandbox) also serves 200 on /status — distinguish by checking
-    // that the response body is Metro's JSON {"status":"packager-status:running"}
-    // not an HTML page from Vite.
-    const contentType = response.headers.get("content-type") ?? "";
-    if (!contentType.includes("application/json")) {
-      console.log(`[Metro Health] content-type=${contentType} (not JSON)`);
-      return false;
-    }
-    const body = await response.json();
-    const hasStatus = typeof body === "object" && body !== null && "status" in body;
-    if (!hasStatus) {
-      console.log(`[Metro Health] body missing status key: ${JSON.stringify(body)}`);
+    // Metro's /status endpoint replies with a plain-text body
+    // "packager-status:running" and no content-type header — it is not JSON.
+    // METRO_BUILD_PORT is a dedicated port used only by this build's own Metro
+    // instance, so no other artifact (e.g. Vite) can ever respond here.
+    const body = await response.text();
+    const isRunning = body.includes("packager-status:running");
+    if (!isRunning) {
+      console.log(`[Metro Health] unexpected body: ${body}`);
       return false;
     }
     return true;
