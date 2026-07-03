@@ -25,6 +25,7 @@ import Wallets from "@/pages/wallets";
 import Notifications from "@/pages/notifications";
 import Reports from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
+import DemoVideo from "@/pages/demo-video";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/demo-video" component={DemoVideo} />
+      <Route path="/preview/demo-video" component={DemoVideo} />
+      <Route path="/preview/:rest*" component={DemoVideo} />
       <Route>
         <AuthGate>
           <Layout>
