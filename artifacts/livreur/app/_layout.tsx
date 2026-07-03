@@ -10,11 +10,13 @@ import { setAuthTokenGetter, setBaseUrl } from "@workspace/api-client-react";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
+import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LocationTrackingProvider } from "@/contexts/LocationTrackingContext";
 import { useColors } from "@/hooks/useColors";
@@ -111,25 +113,28 @@ function PushNotificationRegistrar() {
 function RootLayoutNav() {
   const colors = useColors();
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.background },
-        headerTintColor: colors.foreground,
-        headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
-        contentStyle: { backgroundColor: colors.background },
-        headerBackTitle: "Retour",
-      }}
-    >
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="login" options={{ headerShown: false }} />
-      <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
-      <Stack.Screen name="complete-profile" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="order/[id]"
-        options={{ headerShown: true, title: "Commande" }}
-      />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.foreground,
+          headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
+          contentStyle: { backgroundColor: colors.background },
+          headerBackTitle: "Retour",
+        }}
+      >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+        <Stack.Screen name="complete-profile" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="order/[id]"
+          options={{ headerShown: true, title: "Commande" }}
+        />
+      </Stack>
+      <OfflineBanner />
+    </View>
   );
 }
 

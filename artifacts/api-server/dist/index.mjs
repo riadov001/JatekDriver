@@ -263496,6 +263496,8 @@ router24.patch(
 var remoteConfig_default = router24;
 
 // src/routes/index.ts
+init_src();
+init_drizzle_orm();
 var router25 = (0, import_express25.Router)();
 router25.use(health_default);
 router25.use(auth_default);
@@ -263521,11 +263523,55 @@ router25.use(chat_default);
 router25.use(notifications_default);
 router25.use(referrals_default);
 router25.use(remoteConfig_default);
-router25.get("/events", requireAuth, (req, res) => {
+var ADMIN_ROLES = /* @__PURE__ */ new Set(["admin", "super_admin"]);
+async function isChannelAuthorized(req, channel) {
+  const role = req.userRole ?? "";
+  const userId = req.userId;
+  if (!userId) return false;
+  if (ADMIN_ROLES.has(role)) return true;
+  if (channel === "admin_tracking") return false;
+  if (channel === "available_orders") {
+    return role === "driver";
+  }
+  const [, rawId] = channel.split(":");
+  const id = rawId ? parseInt(rawId, 10) : NaN;
+  if (isNaN(id)) return false;
+  if (channel.startsWith("driver_orders:") || channel.startsWith("driver:")) {
+    const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, id)).limit(1);
+    return !!driver && driver.userId === userId;
+  }
+  if (channel.startsWith("restaurant:")) {
+    const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, id)).limit(1);
+    return !!restaurant && restaurant.ownerId === userId;
+  }
+  if (channel.startsWith("order:")) {
+    const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, id)).limit(1);
+    if (!order) return false;
+    if (order.userId === userId) return true;
+    const [restaurant] = await db.select().from(restaurantsTable).where(eq(restaurantsTable.id, order.restaurantId)).limit(1);
+    if (restaurant && restaurant.ownerId === userId) return true;
+    if (order.driverId) {
+      const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, order.driverId)).limit(1);
+      if (driver && driver.userId === userId) return true;
+    }
+    return false;
+  }
+  return false;
+}
+router25.get("/events", requireAuth, async (req, res) => {
   const raw = req.query.channels ?? "";
-  const channels = raw.split(",").map((c) => c.trim()).filter(Boolean);
-  if (channels.length === 0) {
+  const requested = raw.split(",").map((c) => c.trim()).filter(Boolean);
+  if (requested.length === 0) {
     res.status(400).json({ error: "channels query param required" });
+    return;
+  }
+  const authChecks = await Promise.all(
+    requested.map(async (channel) => ({ channel, ok: await isChannelAuthorized(req, channel) }))
+  );
+  const channels = authChecks.filter((c) => c.ok).map((c) => c.channel);
+  const denied = authChecks.filter((c) => !c.ok).map((c) => c.channel);
+  if (channels.length === 0) {
+    res.status(403).json({ error: "Not authorized for any requested channel", denied });
     return;
   }
   subscribe(req, res, channels);

@@ -24,7 +24,9 @@ import notificationsRouter from "./notifications";
 import referralsRouter from "./referrals";
 import remoteConfigRouter from "./remoteConfig";
 import { subscribe } from "../lib/sse";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, type AuthedRequest } from "../middlewares/auth";
+import { db, ordersTable, restaurantsTable, driversTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -65,13 +67,89 @@ router.use(remoteConfigRouter);
  *   admin_tracking        → global live ops dashboard: every order_status change,
  *                            every driver_location ping, plus driver_offline events
  */
-router.get("/events", requireAuth, (req, res) => {
+const ADMIN_ROLES = new Set(["admin", "super_admin"]);
+
+/**
+ * Verifies the authenticated user is allowed to subscribe to a given SSE
+ * channel. Without this check any logged-in user (e.g. a customer or a
+ * driver) could pass an arbitrary channel name — such as `admin_tracking`
+ * or another driver's `driver:{id}` — and silently receive every driver's
+ * live GPS position. Admins/super_admins may subscribe to anything.
+ */
+async function isChannelAuthorized(req: AuthedRequest, channel: string): Promise<boolean> {
+  const role = req.userRole ?? "";
+  const userId = req.userId;
+  if (!userId) return false;
+  if (ADMIN_ROLES.has(role)) return true;
+
+  if (channel === "admin_tracking") return false;
+
+  if (channel === "available_orders") {
+    return role === "driver";
+  }
+
+  const [, rawId] = channel.split(":");
+  const id = rawId ? parseInt(rawId, 10) : NaN;
+  if (isNaN(id)) return false;
+
+  if (channel.startsWith("driver_orders:") || channel.startsWith("driver:")) {
+    const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, id)).limit(1);
+    return !!driver && driver.userId === userId;
+  }
+
+  if (channel.startsWith("restaurant:")) {
+    const [restaurant] = await db
+      .select()
+      .from(restaurantsTable)
+      .where(eq(restaurantsTable.id, id))
+      .limit(1);
+    return !!restaurant && restaurant.ownerId === userId;
+  }
+
+  if (channel.startsWith("order:")) {
+    const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, id)).limit(1);
+    if (!order) return false;
+    if (order.userId === userId) return true;
+    const [restaurant] = await db
+      .select()
+      .from(restaurantsTable)
+      .where(eq(restaurantsTable.id, order.restaurantId))
+      .limit(1);
+    if (restaurant && restaurant.ownerId === userId) return true;
+    if (order.driverId) {
+      const [driver] = await db
+        .select()
+        .from(driversTable)
+        .where(eq(driversTable.id, order.driverId))
+        .limit(1);
+      if (driver && driver.userId === userId) return true;
+    }
+    return false;
+  }
+
+  // Unknown channel pattern — deny by default.
+  return false;
+}
+
+router.get("/events", requireAuth, async (req: AuthedRequest, res) => {
   const raw = (req.query.channels as string) ?? "";
-  const channels = raw.split(",").map((c) => c.trim()).filter(Boolean);
-  if (channels.length === 0) {
+  const requested = raw.split(",").map((c) => c.trim()).filter(Boolean);
+  if (requested.length === 0) {
     res.status(400).json({ error: "channels query param required" });
     return;
   }
+
+  const authChecks = await Promise.all(
+    requested.map(async (channel) => ({ channel, ok: await isChannelAuthorized(req, channel) })),
+  );
+  const channels = authChecks.filter((c) => c.ok).map((c) => c.channel);
+  const denied = authChecks.filter((c) => !c.ok).map((c) => c.channel);
+
+  if (channels.length === 0) {
+    res.status(403).json({ error: "Not authorized for any requested channel", denied });
+    return;
+  }
+
   subscribe(req, res, channels);
 });
 
