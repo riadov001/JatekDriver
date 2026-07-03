@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -123,12 +123,14 @@ function RemoteConfigSection({ isSuperAdmin }: { isSuperAdmin: boolean }) {
   const [localInit, setLocalInit] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
 
-  if (config && !localInit) {
-    setPrimaryUrl(config.primaryUrl ?? "");
-    setFallbackUrl1(config.fallbackUrl1 ?? "");
-    setFallbackUrl2(config.fallbackUrl2 ?? "");
-    setLocalInit(true);
-  }
+  useEffect(() => {
+    if (config && !localInit) {
+      setPrimaryUrl(config.primaryUrl ?? "");
+      setFallbackUrl1(config.fallbackUrl1 ?? "");
+      setFallbackUrl2(config.fallbackUrl2 ?? "");
+      setLocalInit(true);
+    }
+  }, [config, localInit]);
 
   const updateMutation = useUpdateRemoteConfig({
     mutation: {

@@ -15,7 +15,7 @@ import {
   promoCodeUsagesTable,
   referralsTable,
 } from "@workspace/db";
-import { eq, and, inArray, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, inArray, isNull, isNotNull, or, lt, sql } from "drizzle-orm";
 import { requireAuth, attachAuth, type AuthedRequest } from "../middlewares/auth";
 import {
   CreateOrderBody,
@@ -28,6 +28,7 @@ import { publish } from "../lib/sse";
 import * as tracking from "../lib/trackingService";
 import { pushNotification } from "./notifications";
 import { sendExpoPush } from "../lib/expoPush";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -54,7 +55,7 @@ async function notifyAvailableDrivers(orderId: number, restaurantName: string, d
       })),
     );
   } catch (e) {
-    console.error("[orders] notifyAvailableDrivers failed:", e);
+    logger.error({ err: e }, "[orders] notifyAvailableDrivers failed");
   }
 }
 
@@ -66,7 +67,11 @@ async function getOrderWithItems(orderId: number) {
   return { ...order, items };
 }
 
-router.get("/orders/active", async (req, res): Promise<void> => {
+router.get("/orders/active", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
+  if (req.userRole !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const activeStatuses = ["pending", "accepted", "preparing", "ready", "picked_up", "en_route"];
   const orders = await db.select().from(ordersTable).where(inArray(ordersTable.status, activeStatuses));
 
@@ -81,7 +86,7 @@ router.get("/orders/active", async (req, res): Promise<void> => {
 });
 
 /** Orders that are "ready" — available for any driver to pick up */
-router.get("/orders/available", async (req, res): Promise<void> => {
+router.get("/orders/available", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
   const orders = await db
     .select()
     .from(ordersTable)
@@ -194,6 +199,21 @@ router.post("/orders", requireAuth, async (req: AuthedRequest, res): Promise<voi
       .limit(1);
 
     if (promo && promo.isActive && (!promo.expiresAt || new Date() <= promo.expiresAt)) {
+      // Atomic increment — only succeeds when usedCount < maxUses (or maxUses is null).
+      // This prevents over-redemption under concurrent requests.
+      const [incremented] = await db.update(promoCodesTable)
+        .set({ usedCount: sql`${promoCodesTable.usedCount} + 1` })
+        .where(and(
+          eq(promoCodesTable.id, promo.id),
+          or(isNull(promoCodesTable.maxUses), lt(promoCodesTable.usedCount, promoCodesTable.maxUses!))
+        ))
+        .returning({ usedCount: promoCodesTable.usedCount });
+
+      if (!incremented) {
+        res.status(400).json({ error: "Ce code promo a atteint sa limite d'utilisation." });
+        return;
+      }
+
       if (promo.type === "percentage") {
         discountAmount = Math.min(subtotal, (subtotal * promo.value) / 100);
       } else if (promo.type === "fixed") {
@@ -204,11 +224,6 @@ router.post("/orders", requireAuth, async (req: AuthedRequest, res): Promise<voi
       }
       discountAmount = Math.round(discountAmount * 100) / 100;
       appliedPromoId = promo.id;
-
-      // Increment usage count
-      await db.update(promoCodesTable)
-        .set({ usedCount: promo.usedCount + 1 })
-        .where(eq(promoCodesTable.id, promo.id));
     }
   }
 
@@ -302,7 +317,7 @@ router.post("/orders", requireAuth, async (req: AuthedRequest, res): Promise<voi
   res.status(201).json(orderWithItems);
 });
 
-router.get("/orders/:id", attachAuth, async (req: AuthedRequest, res): Promise<void> => {
+router.get("/orders/:id", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
   const params = GetOrderParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -315,11 +330,34 @@ router.get("/orders/:id", attachAuth, async (req: AuthedRequest, res): Promise<v
     return;
   }
 
+  const isAdmin = req.userRole === "admin";
+  const isCustomerOwner = req.userId === order.userId;
+
+  // Check whether the caller is the driver assigned to this order
+  let isAssignedDriver = false;
+  if (order.driverId) {
+    const [driver] = await db.select({ userId: driversTable.userId })
+      .from(driversTable)
+      .where(eq(driversTable.id, order.driverId))
+      .limit(1);
+    isAssignedDriver = driver?.userId === req.userId;
+  }
+
+  // Check whether the caller is the restaurant owner
+  const [restaurant] = await db.select({ ownerId: restaurantsTable.ownerId })
+    .from(restaurantsTable)
+    .where(eq(restaurantsTable.id, order.restaurantId))
+    .limit(1);
+  const isRestaurantOwner = restaurant?.ownerId === req.userId;
+
+  if (!isAdmin && !isCustomerOwner && !isAssignedDriver && !isRestaurantOwner) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   // The pickup code is the secret that authorises the driver hand-off.
   // Only the customer who placed the order (and admins) may see it; the
   // assigned driver must request it verbally from the customer.
-  const isCustomerOwner = req.userId != null && req.userId === order.userId;
-  const isAdmin = req.userRole === "admin";
   const sanitized = (isCustomerOwner || isAdmin) ? order : { ...order, pickupCode: null };
 
   res.json(sanitized);
@@ -423,7 +461,7 @@ router.patch("/orders/:id/status", requireAuth, async (req: AuthedRequest, res):
   // When order is ready, notify available drivers (SSE + push)
   if (parsed.data.status === "ready") {
     publish("available_orders", "order_ready", { orderId: order.id, restaurantName: order.restaurantName, deliveryAddress: order.deliveryAddress, total: order.total });
-    notifyAvailableDrivers(order.id, order.restaurantName, order.deliveryAddress, order.total).catch(() => {});
+    notifyAvailableDrivers(order.id, order.restaurantName, order.deliveryAddress, order.total);
   }
 
   // When order is assigned to a driver, push to that driver's channel + send push

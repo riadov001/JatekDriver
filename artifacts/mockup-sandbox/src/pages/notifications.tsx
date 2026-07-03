@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { customFetch } from "@workspace/api-client-react";
+import { apiFetch } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,10 +52,9 @@ export default function Notifications() {
     setError(null);
 
     try {
-      const data = await customFetch<SendResult>("/api/backend/notifications/send", {
+      const data = await apiFetch<SendResult>("/api/backend/notifications/send", {
         method: "POST",
         body: JSON.stringify({ target, message: message.trim(), phone: phone.trim() || undefined }),
-        headers: { "Content-Type": "application/json" },
       });
       setResult(data);
     } catch (e: any) {

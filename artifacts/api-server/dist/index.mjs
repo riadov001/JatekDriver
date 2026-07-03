@@ -258849,6 +258849,24 @@ async function anyOtpProviderConfigured() {
   return await twilioConfigured();
 }
 
+// src/lib/logger.ts
+var import_pino = __toESM(require_pino(), 1);
+var isProduction = process.env.NODE_ENV === "production";
+var logger = (0, import_pino.default)({
+  level: process.env.LOG_LEVEL ?? "info",
+  redact: [
+    "req.headers.authorization",
+    "req.headers.cookie",
+    "res.headers['set-cookie']"
+  ],
+  ...isProduction ? {} : {
+    transport: {
+      target: "pino-pretty",
+      options: { colorize: true }
+    }
+  }
+});
+
 // src/routes/auth.ts
 var router2 = (0, import_express2.Router)();
 var JWT_SECRET = process.env.SESSION_SECRET || "jatek-secret-2024";
@@ -258979,7 +258997,7 @@ Valable ${OTP_EXPIRY_MINUTES} minutes. Ne le communiquez \xE0 personne.`;
     smsSent = true;
   } catch (err) {
     deliveryFailed = true;
-    console.error(`[OTP] all providers failed for ${identifier}:`, err?.message ?? err);
+    logger.error({ err }, `[OTP] all providers failed for ${identifier}`);
     if (!canExposeDemoOtp) {
       res.status(502).json({ error: "Impossible d'envoyer le code. R\xE9essayez dans un instant." });
       return;
@@ -259161,10 +259179,10 @@ Valable ${OTP_EXPIRY_MINUTES} minutes.`;
       try {
         await sendOtpEmail(normalizedEmail, code, messageBody);
       } catch (emailErr) {
-        console.error(`[forgot-password] email fallback also failed for ${normalizedEmail}:`, emailErr?.message ?? emailErr);
+        logger.error({ err: emailErr }, `[forgot-password] email fallback also failed for ${normalizedEmail}`);
       }
     } else {
-      console.error(`[forgot-password] delivery failed for ${identifier}:`, err?.message ?? err);
+      logger.error({ err }, `[forgot-password] delivery failed for ${identifier}`);
     }
   }
   if (canExposeDemoOtp) {
@@ -259793,27 +259811,10 @@ data: ${JSON.stringify(data)}
   }
 }
 
-// src/lib/logger.ts
-var import_pino = __toESM(require_pino(), 1);
-var isProduction = process.env.NODE_ENV === "production";
-var logger = (0, import_pino.default)({
-  level: process.env.LOG_LEVEL ?? "info",
-  redact: [
-    "req.headers.authorization",
-    "req.headers.cookie",
-    "res.headers['set-cookie']"
-  ],
-  ...isProduction ? {} : {
-    transport: {
-      target: "pino-pretty",
-      options: { colorize: true }
-    }
-  }
-});
-
 // src/lib/trackingService.ts
 var OFFLINE_THRESHOLD_MS = 3e4;
 var AVG_DRIVER_SPEED_KMH = 25;
+var PURGE_THRESHOLD_MS = 60 * 6e4;
 var drivers = /* @__PURE__ */ new Map();
 function getOrCreate(driverId) {
   let s = drivers.get(driverId);
@@ -259998,7 +259999,7 @@ async function notifyAvailableDrivers(orderId, restaurantName, deliveryAddress, 
       }))
     );
   } catch (e) {
-    console.error("[orders] notifyAvailableDrivers failed:", e);
+    logger.error({ err: e }, "[orders] notifyAvailableDrivers failed");
   }
 }
 async function getOrderWithItems(orderId) {
@@ -260007,7 +260008,11 @@ async function getOrderWithItems(orderId) {
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
   return { ...order, items };
 }
-router6.get("/orders/active", async (req, res) => {
+router6.get("/orders/active", requireAuth, async (req, res) => {
+  if (req.userRole !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const activeStatuses = ["pending", "accepted", "preparing", "ready", "picked_up", "en_route"];
   const orders = await db.select().from(ordersTable).where(inArray(ordersTable.status, activeStatuses));
   const ordersWithItems = await Promise.all(
@@ -260018,7 +260023,7 @@ router6.get("/orders/active", async (req, res) => {
   );
   res.json(ordersWithItems);
 });
-router6.get("/orders/available", async (req, res) => {
+router6.get("/orders/available", requireAuth, async (req, res) => {
   const orders = await db.select().from(ordersTable).where(and(eq(ordersTable.status, "ready"), isNull(ordersTable.driverId)));
   const ordersWithItems = await Promise.all(
     orders.map(async (o) => {
@@ -260095,6 +260100,14 @@ router6.post("/orders", requireAuth, async (req, res) => {
   if (promoCode) {
     const [promo] = await db.select().from(promoCodesTable).where(eq(promoCodesTable.code, promoCode.toUpperCase().trim())).limit(1);
     if (promo && promo.isActive && (!promo.expiresAt || /* @__PURE__ */ new Date() <= promo.expiresAt)) {
+      const [incremented] = await db.update(promoCodesTable).set({ usedCount: sql`${promoCodesTable.usedCount} + 1` }).where(and(
+        eq(promoCodesTable.id, promo.id),
+        or(isNull(promoCodesTable.maxUses), lt(promoCodesTable.usedCount, promoCodesTable.maxUses))
+      )).returning({ usedCount: promoCodesTable.usedCount });
+      if (!incremented) {
+        res.status(400).json({ error: "Ce code promo a atteint sa limite d'utilisation." });
+        return;
+      }
       if (promo.type === "percentage") {
         discountAmount = Math.min(subtotal, subtotal * promo.value / 100);
       } else if (promo.type === "fixed") {
@@ -260105,7 +260118,6 @@ router6.post("/orders", requireAuth, async (req, res) => {
       }
       discountAmount = Math.round(discountAmount * 100) / 100;
       appliedPromoId = promo.id;
-      await db.update(promoCodesTable).set({ usedCount: promo.usedCount + 1 }).where(eq(promoCodesTable.id, promo.id));
     }
   }
   const total = Math.max(0, subtotal + deliveryFee - discountAmount);
@@ -260178,7 +260190,7 @@ router6.post("/orders", requireAuth, async (req, res) => {
   await pushNotification(restaurant.ownerId, "order_new", "\u{1F6CE} Nouvelle commande", `Commande #${order.reference ?? order.id} \u2014 ${total.toFixed(0)} DH de ${user?.name ?? "un client"}`, { orderId: order.id });
   res.status(201).json(orderWithItems);
 });
-router6.get("/orders/:id", attachAuth, async (req, res) => {
+router6.get("/orders/:id", requireAuth, async (req, res) => {
   const params = GetOrderParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -260189,8 +260201,19 @@ router6.get("/orders/:id", attachAuth, async (req, res) => {
     res.status(404).json({ error: "Order not found" });
     return;
   }
-  const isCustomerOwner = req.userId != null && req.userId === order.userId;
   const isAdmin = req.userRole === "admin";
+  const isCustomerOwner = req.userId === order.userId;
+  let isAssignedDriver = false;
+  if (order.driverId) {
+    const [driver] = await db.select({ userId: driversTable.userId }).from(driversTable).where(eq(driversTable.id, order.driverId)).limit(1);
+    isAssignedDriver = driver?.userId === req.userId;
+  }
+  const [restaurant] = await db.select({ ownerId: restaurantsTable.ownerId }).from(restaurantsTable).where(eq(restaurantsTable.id, order.restaurantId)).limit(1);
+  const isRestaurantOwner = restaurant?.ownerId === req.userId;
+  if (!isAdmin && !isCustomerOwner && !isAssignedDriver && !isRestaurantOwner) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const sanitized = isCustomerOwner || isAdmin ? order : { ...order, pickupCode: null };
   res.json(sanitized);
 });
@@ -260270,8 +260293,7 @@ router6.patch("/orders/:id/status", requireAuth, async (req, res) => {
   publish("admin_tracking", "order_status", { orderId: order.id, status: order.status, driverId: order.driverId });
   if (parsed.data.status === "ready") {
     publish("available_orders", "order_ready", { orderId: order.id, restaurantName: order.restaurantName, deliveryAddress: order.deliveryAddress, total: order.total });
-    notifyAvailableDrivers(order.id, order.restaurantName, order.deliveryAddress, order.total).catch(() => {
-    });
+    notifyAvailableDrivers(order.id, order.restaurantName, order.deliveryAddress, order.total);
   }
   if (parsed.data.driverId) {
     publish(`driver_orders:${parsed.data.driverId}`, "order_assigned", { orderId: order.id, order: orderWithItems });
@@ -260697,7 +260719,11 @@ var import_express7 = __toESM(require_express2(), 1);
 init_src();
 init_drizzle_orm();
 var router7 = (0, import_express7.Router)();
-router7.get("/users", async (req, res) => {
+router7.get("/users", requireAuth, async (req, res) => {
+  if (req.userRole !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const queryParams = ListUsersQueryParams.safeParse(req.query);
   let conditions = [];
   if (queryParams.success) {
@@ -260708,7 +260734,11 @@ router7.get("/users", async (req, res) => {
   const users = conditions.length > 0 ? await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, role: usersTable.role, phone: usersTable.phone, address: usersTable.address, avatarUrl: usersTable.avatarUrl, isActive: usersTable.isActive, loyaltyPoints: usersTable.loyaltyPoints, createdAt: usersTable.createdAt }).from(usersTable).where(and(...conditions)) : await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, role: usersTable.role, phone: usersTable.phone, address: usersTable.address, avatarUrl: usersTable.avatarUrl, isActive: usersTable.isActive, loyaltyPoints: usersTable.loyaltyPoints, createdAt: usersTable.createdAt }).from(usersTable);
   res.json(users);
 });
-router7.get("/users/:id", async (req, res) => {
+router7.get("/users/:id", requireAuth, async (req, res) => {
+  if (req.userRole !== "admin" && req.userId !== Number(req.params.id)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const params = GetUserParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -260736,7 +260766,13 @@ router7.patch("/users/:id", requireAuth, async (req, res) => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [user] = await db.update(usersTable).set(parsed.data).where(eq(usersTable.id, params.data.id)).returning({ id: usersTable.id, name: usersTable.name, email: usersTable.email, role: usersTable.role, phone: usersTable.phone, address: usersTable.address, avatarUrl: usersTable.avatarUrl, isActive: usersTable.isActive, loyaltyPoints: usersTable.loyaltyPoints, createdAt: usersTable.createdAt });
+  const { isActive: _adminOnly, ...userSafeFields } = parsed.data;
+  const updateBody = req.userRole === "admin" ? parsed.data : userSafeFields;
+  if (Object.keys(updateBody).length === 0) {
+    res.status(400).json({ error: "No updatable fields provided" });
+    return;
+  }
+  const [user] = await db.update(usersTable).set(updateBody).where(eq(usersTable.id, params.data.id)).returning({ id: usersTable.id, name: usersTable.name, email: usersTable.email, role: usersTable.role, phone: usersTable.phone, address: usersTable.address, avatarUrl: usersTable.avatarUrl, isActive: usersTable.isActive, loyaltyPoints: usersTable.loyaltyPoints, createdAt: usersTable.createdAt });
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
@@ -260763,7 +260799,11 @@ var import_express8 = __toESM(require_express2(), 1);
 init_src();
 init_drizzle_orm();
 var router8 = (0, import_express8.Router)();
-router8.get("/drivers", async (req, res) => {
+router8.get("/drivers", requireAuth, async (req, res) => {
+  if (req.userRole !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const queryParams = ListDriversQueryParams.safeParse(req.query);
   let conditions = [];
   if (queryParams.success && queryParams.data.isAvailable !== void 0) {
@@ -260784,12 +260824,8 @@ router8.get("/drivers/me", async (req, res) => {
   }
   res.json(driver);
 });
-router8.get("/drivers/:id", async (req, res) => {
+router8.get("/drivers/:id", requireAuth, async (req, res) => {
   if (req.params.id === "me") {
-    if (!req.userId) {
-      res.status(401).json({ error: "Authentication required" });
-      return;
-    }
     const [driver2] = await db.select().from(driversTable).where(eq(driversTable.userId, req.userId)).limit(1);
     if (!driver2) {
       res.status(404).json({ error: "Driver not found" });
@@ -260806,6 +260842,10 @@ router8.get("/drivers/:id", async (req, res) => {
   const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, params.data.id)).limit(1);
   if (!driver) {
     res.status(404).json({ error: "Driver not found" });
+    return;
+  }
+  if (req.userRole !== "admin" && driver.userId !== req.userId) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
   res.json(driver);
@@ -260969,7 +261009,7 @@ router8.post("/drivers/:id/heartbeat", requireAuth, async (req, res) => {
   recordHeartbeat(id);
   res.json({ alive: true, ts: Date.now() });
 });
-router8.get("/drivers/:id/location", async (req, res) => {
+router8.get("/drivers/:id/location", requireAuth, async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid driver id" });
@@ -260978,6 +261018,10 @@ router8.get("/drivers/:id/location", async (req, res) => {
   const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, id)).limit(1);
   if (!driver) {
     res.status(404).json({ error: "Driver not found" });
+    return;
+  }
+  if (req.userRole !== "admin" && driver.userId !== req.userId) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
   res.json({

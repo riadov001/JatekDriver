@@ -1,1 +1,2 @@
 - [Push notification architecture](push-notifications.md) — Expo Push API called from backend (ma.jatek.app); pushToken stored on usersTable; PUT /api/push-token to register.
+- [Livreur build port collision](livreur-build-port-collision.md) — livreur's production build script hardcoded Metro port 8081, colliding with the admin dashboard artifact and hanging publish.

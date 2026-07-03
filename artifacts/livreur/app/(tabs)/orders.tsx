@@ -52,7 +52,7 @@ export default function OrdersScreen() {
       query: {
         queryKey: getListOrdersQueryKey({ driverId: driverId ?? undefined }),
         enabled: !!driverId,
-        refetchInterval: 20000,
+        refetchInterval: 8000,
       },
     },
   );

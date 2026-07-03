@@ -164,7 +164,7 @@ export default function HomeScreen() {
             </View>
           </View>
           <View style={{ gap: 12 }}>
-            {availableQuery.data!.map((o: Order) => (
+            {(availableQuery.data ?? []).map((o: Order) => (
               <AvailableOrderCard key={o.id} order={o} driverId={driverId!} />
             ))}
           </View>

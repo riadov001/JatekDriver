@@ -24,7 +24,7 @@ import {
   SheetDescription 
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -140,7 +140,7 @@ export default function Orders() {
                     onClick={() => setSelectedOrder(order)}
                   >
                     <TableCell className="font-medium">#{order.id}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{format(new Date(order.createdAt), "MMM d, yyyy HH:mm")}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{(() => { const d = new Date(order.createdAt); return isValid(d) ? format(d, "MMM d, yyyy HH:mm") : "—"; })()}</TableCell>
                     <TableCell>{order.userName}</TableCell>
                     <TableCell className="hidden sm:table-cell">{order.restaurantName}</TableCell>
                     <TableCell>
@@ -164,7 +164,7 @@ export default function Orders() {
               <SheetHeader className="mb-6">
                 <SheetTitle className="text-2xl">Order #{selectedOrder.id}</SheetTitle>
                 <SheetDescription>
-                  Placed on {format(new Date(selectedOrder.createdAt), "PPP 'at' p")}
+                  {(() => { const d = new Date(selectedOrder.createdAt); return isValid(d) ? `Placed on ${format(d, "PPP 'at' p")}` : "Date unavailable"; })()}
                 </SheetDescription>
               </SheetHeader>
               

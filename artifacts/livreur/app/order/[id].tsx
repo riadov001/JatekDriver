@@ -1,8 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import {
-  getListOrdersQueryKey,
   useConfirmOrderDelivery,
-  useListOrders,
+  useGetOrder,
   type Order,
 } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
@@ -61,21 +60,14 @@ export default function OrderDetailScreen() {
   const mapRef = useRef<MapView>(null);
   const [followDriver, setFollowDriver] = useState(true);
 
-  const ordersQuery = useListOrders(
-    { driverId: driverId ?? undefined },
-    {
-      query: {
-        queryKey: getListOrdersQueryKey({ driverId: driverId ?? undefined }),
-        enabled: !!driverId,
-        refetchInterval: 8000,
-      },
+  const ordersQuery = useGetOrder(orderId, {
+    query: {
+      enabled: !!orderId,
+      refetchInterval: 8000,
     },
-  );
+  });
 
-  const order: Order | undefined = useMemo(
-    () => (ordersQuery.data ?? []).find((o: Order) => o.id === orderId),
-    [ordersQuery.data, orderId],
-  );
+  const order: Order | undefined = ordersQuery.data;
 
   const isActive = order?.status === "picked_up" || order?.status === "en_route";
 
@@ -154,11 +146,15 @@ export default function OrderDetailScreen() {
       default: `https://www.google.com/maps/dir/?api=1&destination=${dest}`,
     }) as string;
 
-    const canOpen = await Linking.canOpenURL(gmapsUrl);
-    if (canOpen) {
-      Linking.openURL(gmapsUrl);
-    } else {
-      Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${dest}`);
+    try {
+      const canOpen = await Linking.canOpenURL(gmapsUrl);
+      if (canOpen) {
+        await Linking.openURL(gmapsUrl);
+      } else {
+        await Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${dest}`);
+      }
+    } catch {
+      Alert.alert("Navigation", "Impossible d'ouvrir l'application de navigation.");
     }
   };
 

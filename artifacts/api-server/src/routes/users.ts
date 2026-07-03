@@ -12,7 +12,11 @@ import { requireAuth, type AuthedRequest } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
-router.get("/users", async (req, res): Promise<void> => {
+router.get("/users", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
+  if (req.userRole !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const queryParams = ListUsersQueryParams.safeParse(req.query);
 
   let conditions: any[] = [];
@@ -30,7 +34,11 @@ router.get("/users", async (req, res): Promise<void> => {
   res.json(users);
 });
 
-router.get("/users/:id", async (req, res): Promise<void> => {
+router.get("/users/:id", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
+  if (req.userRole !== "admin" && req.userId !== Number(req.params.id)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const params = GetUserParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -68,9 +76,21 @@ router.patch("/users/:id", requireAuth, async (req: AuthedRequest, res): Promise
     return;
   }
 
+  // Non-admins must not be able to flip their own isActive flag — e.g. a
+  // banned user reactivating themselves or a user locking themselves out.
+  const { isActive: _adminOnly, ...userSafeFields } = parsed.data;
+  const updateBody = req.userRole === "admin" ? parsed.data : userSafeFields;
+
+  // Reject if the caller has no permitted fields to change (e.g. non-admin
+  // sends only isActive — stripping it leaves an empty payload).
+  if (Object.keys(updateBody).length === 0) {
+    res.status(400).json({ error: "No updatable fields provided" });
+    return;
+  }
+
   const [user] = await db
     .update(usersTable)
-    .set(parsed.data)
+    .set(updateBody)
     .where(eq(usersTable.id, params.data.id))
     .returning({ id: usersTable.id, name: usersTable.name, email: usersTable.email, role: usersTable.role, phone: usersTable.phone, address: usersTable.address, avatarUrl: usersTable.avatarUrl, isActive: usersTable.isActive, loyaltyPoints: usersTable.loyaltyPoints, createdAt: usersTable.createdAt });
 

@@ -14,7 +14,12 @@ import {
 
 const router: IRouter = Router();
 
-router.get("/drivers", async (req, res): Promise<void> => {
+router.get("/drivers", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
+  if (req.userRole !== "admin") {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   const queryParams = ListDriversQueryParams.safeParse(req.query);
 
   let conditions: any[] = [];
@@ -40,11 +45,10 @@ router.get("/drivers/me", async (req: AuthedRequest, res): Promise<void> => {
   res.json(driver);
 });
 
-router.get("/drivers/:id", async (req: AuthedRequest, res): Promise<void> => {
+router.get("/drivers/:id", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
   // "me" alias — works even if the dedicated /drivers/me route is shadowed
   if (req.params.id === "me") {
-    if (!req.userId) { res.status(401).json({ error: "Authentication required" }); return; }
-    const [driver] = await db.select().from(driversTable).where(eq(driversTable.userId, req.userId)).limit(1);
+    const [driver] = await db.select().from(driversTable).where(eq(driversTable.userId, req.userId!)).limit(1);
     if (!driver) { res.status(404).json({ error: "Driver not found" }); return; }
     res.json(driver);
     return;
@@ -59,6 +63,12 @@ router.get("/drivers/:id", async (req: AuthedRequest, res): Promise<void> => {
   const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, params.data.id)).limit(1);
   if (!driver) {
     res.status(404).json({ error: "Driver not found" });
+    return;
+  }
+
+  // Only the driver themselves or an admin may view a driver's full profile.
+  if (req.userRole !== "admin" && driver.userId !== req.userId) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 
@@ -247,12 +257,20 @@ router.post("/drivers/:id/heartbeat", requireAuth, async (req: AuthedRequest, re
   res.json({ alive: true, ts: Date.now() });
 });
 
-router.get("/drivers/:id/location", async (req, res): Promise<void> => {
+router.get("/drivers/:id/location", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid driver id" }); return; }
 
   const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, id)).limit(1);
   if (!driver) { res.status(404).json({ error: "Driver not found" }); return; }
+
+  // Only the driver themselves or an admin may query raw location. Customers
+  // track their order via GET /orders/:id/tracking, which already enforces
+  // assigned-driver / order-owner / restaurant-owner / admin scoping.
+  if (req.userRole !== "admin" && driver.userId !== req.userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
   res.json({
     latitude: driver.latitude,

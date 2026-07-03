@@ -5,6 +5,7 @@ import { db, usersTable, driversTable, otpCodesTable } from "@workspace/db";
 import { eq, and, gt, desc } from "drizzle-orm";
 import { RegisterBody, LoginBody } from "@workspace/api-zod";
 import { sendOtpMessage, sendOtpEmail, anyOtpProviderConfigured } from "../lib/otpMessaging.js";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -174,7 +175,7 @@ router.post("/auth/send-otp", async (req, res): Promise<void> => {
     smsSent = true;
   } catch (err: any) {
     deliveryFailed = true;
-    console.error(`[OTP] all providers failed for ${identifier}:`, err?.message ?? err);
+    logger.error({ err }, `[OTP] all providers failed for ${identifier}`);
     if (!canExposeDemoOtp) {
       res.status(502).json({ error: "Impossible d'envoyer le code. Réessayez dans un instant." });
       return;
@@ -432,10 +433,10 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
       try {
         await sendOtpEmail(normalizedEmail, code, messageBody);
       } catch (emailErr: any) {
-        console.error(`[forgot-password] email fallback also failed for ${normalizedEmail}:`, emailErr?.message ?? emailErr);
+        logger.error({ err: emailErr }, `[forgot-password] email fallback also failed for ${normalizedEmail}`);
       }
     } else {
-      console.error(`[forgot-password] delivery failed for ${identifier}:`, err?.message ?? err);
+      logger.error({ err }, `[forgot-password] delivery failed for ${identifier}`);
     }
   }
 

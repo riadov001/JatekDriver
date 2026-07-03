@@ -18,6 +18,8 @@ import { publish } from "./sse";
 const OFFLINE_THRESHOLD_MS = 30_000;
 const WATCHDOG_INTERVAL_MS = 15_000;
 const AVG_DRIVER_SPEED_KMH = 25;
+/** Drivers silent for this long with no active orders are evicted from the Map. */
+const PURGE_THRESHOLD_MS = 60 * 60_000; // 1 hour
 
 interface DriverState {
   driverId: number;
@@ -141,11 +143,13 @@ export function calculateETA(
   return Math.max(1, Math.ceil(minutes));
 }
 
-/** Watchdog: every WATCHDOG_INTERVAL_MS, flag silent drivers as offline. */
+/** Watchdog: every WATCHDOG_INTERVAL_MS, flag silent drivers as offline and purge stale entries. */
 function runWatchdogTick(): void {
   const now = Date.now();
-  for (const s of drivers.values()) {
+  for (const [driverId, s] of drivers.entries()) {
     const silentMs = now - s.lastSeen;
+
+    // Broadcast offline event once when driver first crosses the threshold.
     if (silentMs > OFFLINE_THRESHOLD_MS && !s.offlineNotified) {
       s.offlineNotified = true;
       const payload = {
@@ -163,6 +167,13 @@ function runWatchdogTick(): void {
         { driverId: s.driverId, silentMs, orderIds: Array.from(s.orderIds) },
         "trackingService: driver offline",
       );
+    }
+
+    // Evict drivers that have been silent for over an hour and have no active
+    // orders — they won't receive any more events and keeping them wastes memory.
+    if (silentMs > PURGE_THRESHOLD_MS && s.orderIds.size === 0) {
+      drivers.delete(driverId);
+      logger.debug({ driverId }, "trackingService: evicted stale driver entry");
     }
   }
 }
