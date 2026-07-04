@@ -1,8 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import {
   getGetDriverEarningsQueryKey,
+  getGetDriverLeaderboardQueryKey,
   useGetDriverEarnings,
+  useGetDriverLeaderboard,
 } from "@workspace/api-client-react";
+import { useEffect, useState } from "react";
 import {
   Platform,
   RefreshControl,
@@ -13,9 +16,12 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { LeaderboardCard } from "@/components/LeaderboardCard";
 import { StatCard } from "@/components/StatCard";
+import { WeeklyGoalCard } from "@/components/WeeklyGoalCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { getWeeklyGoal, setWeeklyGoal as persistWeeklyGoal } from "@/lib/weeklyGoal";
 
 function formatMad(v: number | undefined): string {
   return `${(v ?? 0).toFixed(2)} MAD`;
@@ -25,6 +31,16 @@ export default function EarningsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { driverId } = useAuth();
+  const [weeklyGoal, setWeeklyGoalState] = useState<number | null>(null);
+
+  useEffect(() => {
+    getWeeklyGoal().then(setWeeklyGoalState);
+  }, []);
+
+  const handleChangeGoal = (value: number) => {
+    setWeeklyGoalState(value);
+    persistWeeklyGoal(value);
+  };
 
   const earningsQuery = useGetDriverEarnings(driverId ?? 0, {
     query: {
@@ -33,7 +49,15 @@ export default function EarningsScreen() {
     },
   });
 
+  const leaderboardQuery = useGetDriverLeaderboard(driverId ?? 0, {
+    query: {
+      queryKey: getGetDriverLeaderboardQueryKey(driverId ?? 0),
+      enabled: !!driverId,
+    },
+  });
+
   const data = earningsQuery.data;
+  const leaderboard = leaderboardQuery.data;
   const webTopInset = Platform.OS === "web" ? 67 : 0;
 
   return (
@@ -110,6 +134,24 @@ export default function EarningsScreen() {
           />
         </View>
       </View>
+
+      {weeklyGoal !== null && (
+        <WeeklyGoalCard
+          goal={weeklyGoal}
+          current={data?.thisWeek ?? 0}
+          onChangeGoal={handleChangeGoal}
+        />
+      )}
+
+      {leaderboard && (
+        <LeaderboardCard
+          rank={leaderboard.rank}
+          totalDrivers={leaderboard.totalDrivers}
+          percentile={leaderboard.percentile}
+          weeklyEarnings={leaderboard.weeklyEarnings}
+          topWeeklyEarnings={leaderboard.topWeeklyEarnings}
+        />
+      )}
 
       <View
         style={[

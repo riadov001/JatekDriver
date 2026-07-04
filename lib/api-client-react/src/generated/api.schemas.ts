@@ -62,8 +62,6 @@ export interface User {
 export interface AuthResponse {
   token: string;
   user: User;
-  /** Present when the authenticated user is a driver */
-  driver?: Driver;
 }
 
 /**
@@ -259,6 +257,8 @@ export interface Order {
   driverId?: number | null;
   restaurantName: string;
   userName: string;
+  /** @nullable */
+  userPhone?: string | null;
   status: OrderStatus;
   subtotal: number;
   deliveryFee: number;
@@ -353,6 +353,14 @@ export interface DriverEarnings {
   totalEarnings: number;
   totalDeliveries: number;
   completedToday: number;
+}
+
+export interface DriverLeaderboard {
+  rank: number;
+  totalDrivers: number;
+  weeklyEarnings: number;
+  topWeeklyEarnings: number;
+  percentile: number;
 }
 
 export interface Review {
@@ -552,6 +560,20 @@ export interface AcceptDeliveryBody {
 export interface ConfirmDeliveryBody {
   /** @pattern ^\d{4}$ */
   pickupCode: string;
+}
+
+export type NotifyCustomerBodyMessageKey =
+  (typeof NotifyCustomerBodyMessageKey)[keyof typeof NotifyCustomerBodyMessageKey];
+
+export const NotifyCustomerBodyMessageKey = {
+  arriving: "arriving",
+  arrived: "arrived",
+  traffic: "traffic",
+  calling: "calling",
+} as const;
+
+export interface NotifyCustomerBody {
+  messageKey: NotifyCustomerBodyMessageKey;
 }
 
 export interface CompleteDriverProfileBody {
@@ -1086,6 +1108,10 @@ export type ListOrdersParams = {
   userId?: number;
   restaurantId?: number;
   driverId?: number;
+};
+
+export type NotifyCustomer200 = {
+  success: boolean;
 };
 
 export type GetOrderInvoiceParams = {

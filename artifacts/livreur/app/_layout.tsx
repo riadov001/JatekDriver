@@ -19,6 +19,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LocationTrackingProvider } from "@/contexts/LocationTrackingContext";
+import { NewOrderAlertProvider } from "@/contexts/NewOrderAlertContext";
 import { useColors } from "@/hooks/useColors";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { storage } from "@/lib/storage";
@@ -172,8 +173,10 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <LocationTrackingProvider>
-                  <PushNotificationRegistrar />
-                  <RootLayoutNav />
+                  <NewOrderAlertProvider>
+                    <PushNotificationRegistrar />
+                    <RootLayoutNav />
+                  </NewOrderAlertProvider>
                 </LocationTrackingProvider>
               </AuthProvider>
             </KeyboardProvider>

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, driversTable, ordersTable, driverEarningsTable } from "@workspace/db";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, gte, sql } from "drizzle-orm";
 import { publish } from "../lib/sse";
 import * as tracking from "../lib/trackingService";
 import { requireAuth, type AuthedRequest } from "../middlewares/auth";
@@ -329,6 +329,55 @@ router.get("/drivers/:id/earnings", requireAuth, async (req: AuthedRequest, res)
     totalDeliveries: driver.totalDeliveries,
     completedToday,
   });
+});
+
+/** Anonymized weekly leaderboard: driver's own rank among all drivers. */
+router.get("/drivers/:id/leaderboard", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
+  const params = GetDriverEarningsParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const driverId = params.data.id;
+  const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, driverId)).limit(1);
+
+  if (!driver) {
+    res.status(404).json({ error: "Driver not found" });
+    return;
+  }
+  if (req.userRole !== "admin" && driver.userId !== req.userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const rows = await db
+    .select({
+      driverId: driverEarningsTable.driverId,
+      total: sql<number>`sum(${driverEarningsTable.amount})`,
+    })
+    .from(driverEarningsTable)
+    .where(gte(driverEarningsTable.createdAt, startOfWeek))
+    .groupBy(driverEarningsTable.driverId);
+
+  const totals = rows.map((r) => ({ driverId: r.driverId, total: Number(r.total) || 0 }));
+  const sorted = [...totals].sort((a, b) => b.total - a.total);
+
+  const myEntry = totals.find((t) => t.driverId === driverId);
+  const weeklyEarnings = Math.round((myEntry?.total ?? 0) * 100) / 100;
+  const totalDrivers = Math.max(sorted.length, 1);
+  const rank = myEntry
+    ? sorted.findIndex((t) => t.driverId === driverId) + 1
+    : totalDrivers;
+  const topWeeklyEarnings = Math.round((sorted[0]?.total ?? 0) * 100) / 100;
+  const percentile = totalDrivers > 0 ? Math.round(((totalDrivers - rank) / totalDrivers) * 100) : 0;
+
+  res.json({ rank, totalDrivers, weeklyEarnings, topWeeklyEarnings, percentile });
 });
 
 router.get("/drivers/:id/earnings/history", requireAuth, async (req: AuthedRequest, res): Promise<void> => {

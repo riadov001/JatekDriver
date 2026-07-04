@@ -44,6 +44,7 @@ import type {
   DashboardTodo,
   Driver,
   DriverEarnings,
+  DriverLeaderboard,
   DriverLocation,
   DriverLocationPublic,
   DriverLocationUpdateBody,
@@ -73,6 +74,8 @@ import type {
   LoginBody,
   MenuItem,
   NotificationPrefs,
+  NotifyCustomer200,
+  NotifyCustomerBody,
   Order,
   PasswordResetRequestResponse,
   PasswordResetResponse,
@@ -4013,6 +4016,95 @@ export function useGetDriverEarnings<
 }
 
 /**
+ * JWT required. Driver owner or admin only.
+ * @summary Get driver ranking among all drivers this week
+ */
+export const getGetDriverLeaderboardUrl = (id: number) => {
+  return `/api/drivers/${id}/leaderboard`;
+};
+
+export const getDriverLeaderboard = async (
+  id: number,
+  options?: RequestInit,
+): Promise<DriverLeaderboard> => {
+  return customFetch<DriverLeaderboard>(getGetDriverLeaderboardUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetDriverLeaderboardQueryKey = (id: number) => {
+  return [`/api/drivers/${id}/leaderboard`] as const;
+};
+
+export const getGetDriverLeaderboardQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDriverLeaderboard>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDriverLeaderboard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getGetDriverLeaderboardQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDriverLeaderboard>>
+  > = ({ signal }) => getDriverLeaderboard(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDriverLeaderboard>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetDriverLeaderboardQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDriverLeaderboard>>
+>;
+export type GetDriverLeaderboardQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get driver ranking among all drivers this week
+ */
+
+export function useGetDriverLeaderboard<
+  TData = Awaited<ReturnType<typeof getDriverLeaderboard>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getDriverLeaderboard>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetDriverLeaderboardQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary Update driver live location
  */
 export const getUpdateDriverLocationUrl = (id: number) => {
@@ -5616,6 +5708,93 @@ export const useConfirmOrderDelivery = <
   TContext
 > => {
   return useMutation(getConfirmOrderDeliveryMutationOptions(options));
+};
+
+/**
+ * @summary Driver sends a quick preset message to the customer (push notification)
+ */
+export const getNotifyCustomerUrl = (id: number) => {
+  return `/api/orders/${id}/notify-customer`;
+};
+
+export const notifyCustomer = async (
+  id: number,
+  notifyCustomerBody: NotifyCustomerBody,
+  options?: RequestInit,
+): Promise<NotifyCustomer200> => {
+  return customFetch<NotifyCustomer200>(getNotifyCustomerUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(notifyCustomerBody),
+  });
+};
+
+export const getNotifyCustomerMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof notifyCustomer>>,
+    TError,
+    { id: number; data: BodyType<NotifyCustomerBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof notifyCustomer>>,
+  TError,
+  { id: number; data: BodyType<NotifyCustomerBody> },
+  TContext
+> => {
+  const mutationKey = ["notifyCustomer"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof notifyCustomer>>,
+    { id: number; data: BodyType<NotifyCustomerBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return notifyCustomer(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type NotifyCustomerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof notifyCustomer>>
+>;
+export type NotifyCustomerMutationBody = BodyType<NotifyCustomerBody>;
+export type NotifyCustomerMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Driver sends a quick preset message to the customer (push notification)
+ */
+export const useNotifyCustomer = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof notifyCustomer>>,
+    TError,
+    { id: number; data: BodyType<NotifyCustomerBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof notifyCustomer>>,
+  TError,
+  { id: number; data: BodyType<NotifyCustomerBody> },
+  TContext
+> => {
+  return useMutation(getNotifyCustomerMutationOptions(options));
 };
 
 /**

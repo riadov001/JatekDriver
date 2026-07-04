@@ -72,6 +72,7 @@ export const GetRecentOrdersResponseItem = zod.object({
   driverId: zod.number().nullish(),
   restaurantName: zod.string(),
   userName: zod.string(),
+  userPhone: zod.string().nullish(),
   status: zod.enum([
     "pending",
     "accepted",
@@ -481,6 +482,7 @@ export const ListBackendOrdersResponseItem = zod.object({
   driverId: zod.number().nullish(),
   restaurantName: zod.string(),
   userName: zod.string(),
+  userPhone: zod.string().nullish(),
   status: zod.enum([
     "pending",
     "accepted",
@@ -1026,6 +1028,22 @@ export const GetDriverEarningsResponse = zod.object({
 });
 
 /**
+ * JWT required. Driver owner or admin only.
+ * @summary Get driver ranking among all drivers this week
+ */
+export const GetDriverLeaderboardParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetDriverLeaderboardResponse = zod.object({
+  rank: zod.number(),
+  totalDrivers: zod.number(),
+  weeklyEarnings: zod.number(),
+  topWeeklyEarnings: zod.number(),
+  percentile: zod.number(),
+});
+
+/**
  * @summary Update driver live location
  */
 export const UpdateDriverLocationParams = zod.object({
@@ -1167,6 +1185,7 @@ export const ExportMyDataResponse = zod.object({
       driverId: zod.number().nullish(),
       restaurantName: zod.string(),
       userName: zod.string(),
+      userPhone: zod.string().nullish(),
       status: zod.enum([
         "pending",
         "accepted",
@@ -1423,6 +1442,7 @@ export const ListOrdersResponseItem = zod.object({
   driverId: zod.number().nullish(),
   restaurantName: zod.string(),
   userName: zod.string(),
+  userPhone: zod.string().nullish(),
   status: zod.enum([
     "pending",
     "accepted",
@@ -1487,8 +1507,8 @@ export const GetOrderResponse = zod.object({
   restaurantId: zod.number(),
   driverId: zod.number().nullish(),
   restaurantName: zod.string(),
-  restaurantAddress: zod.string().nullish(),
   userName: zod.string(),
+  userPhone: zod.string().nullish(),
   status: zod.enum([
     "pending",
     "accepted",
@@ -1541,6 +1561,7 @@ export const AcceptOrderDeliveryResponse = zod.object({
   driverId: zod.number().nullish(),
   restaurantName: zod.string(),
   userName: zod.string(),
+  userPhone: zod.string().nullish(),
   status: zod.enum([
     "pending",
     "accepted",
@@ -1595,6 +1616,7 @@ export const ConfirmOrderDeliveryResponse = zod.object({
   driverId: zod.number().nullish(),
   restaurantName: zod.string(),
   userName: zod.string(),
+  userPhone: zod.string().nullish(),
   status: zod.enum([
     "pending",
     "accepted",
@@ -1627,6 +1649,21 @@ export const ConfirmOrderDeliveryResponse = zod.object({
   reference: zod.string().nullish(),
   kitchenCode: zod.string().nullish(),
   pickupCode: zod.string().nullish(),
+});
+
+/**
+ * @summary Driver sends a quick preset message to the customer (push notification)
+ */
+export const NotifyCustomerParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const NotifyCustomerBody = zod.object({
+  messageKey: zod.enum(["arriving", "arrived", "traffic", "calling"]),
+});
+
+export const NotifyCustomerResponse = zod.object({
+  success: zod.boolean(),
 });
 
 /**
@@ -1687,6 +1724,7 @@ export const UpdateOrderStatusResponse = zod.object({
   driverId: zod.number().nullish(),
   restaurantName: zod.string(),
   userName: zod.string(),
+  userPhone: zod.string().nullish(),
   status: zod.enum([
     "pending",
     "accepted",
@@ -1731,6 +1769,7 @@ export const GetActiveOrdersResponseItem = zod.object({
   driverId: zod.number().nullish(),
   restaurantName: zod.string(),
   userName: zod.string(),
+  userPhone: zod.string().nullish(),
   status: zod.enum([
     "pending",
     "accepted",
@@ -1776,6 +1815,7 @@ export const GetAvailableOrdersResponseItem = zod.object({
   driverId: zod.number().nullish(),
   restaurantName: zod.string(),
   userName: zod.string(),
+  userPhone: zod.string().nullish(),
   status: zod.enum([
     "pending",
     "accepted",
@@ -2087,11 +2127,6 @@ export const GetRestaurantResponse = zod.object({
   ice: zod.string().nullish(),
   printerEmail: zod.string().nullish(),
   profileCompletedAt: zod.coerce.date().nullish(),
-  googlePlaceId: zod.string().nullish(),
-  openingHours: zod.string().nullish(),
-  latitude: zod.number().nullish(),
-  longitude: zod.number().nullish(),
-  website: zod.string().nullish(),
   freeDeliveryThreshold: zod
     .number()
     .optional()
@@ -2122,11 +2157,6 @@ export const UpdateRestaurantBody = zod.object({
   deliveryFee: zod.number().optional(),
   minimumOrder: zod.number().optional(),
   isVerified: zod.boolean().optional(),
-  googlePlaceId: zod.string().nullish(),
-  openingHours: zod.string().nullish(),
-  latitude: zod.number().nullish(),
-  longitude: zod.number().nullish(),
-  website: zod.string().nullish(),
 });
 
 export const UpdateRestaurantResponse = zod.object({
@@ -2154,11 +2184,6 @@ export const UpdateRestaurantResponse = zod.object({
   ice: zod.string().nullish(),
   printerEmail: zod.string().nullish(),
   profileCompletedAt: zod.coerce.date().nullish(),
-  googlePlaceId: zod.string().nullish(),
-  openingHours: zod.string().nullish(),
-  latitude: zod.number().nullish(),
-  longitude: zod.number().nullish(),
-  website: zod.string().nullish(),
   freeDeliveryThreshold: zod
     .number()
     .optional()
@@ -2225,20 +2250,6 @@ export const CompleteRestaurantProfileResponse = zod.object({
 /**
  * @summary Get restaurant statistics
  */
-export const SyncRestaurantPlacesParams = zod.object({
-  id: zod.coerce.number(),
-});
-
-export const SyncRestaurantPlacesResponse = zod.object({
-  id: zod.number(),
-  googlePlaceId: zod.string().nullish(),
-  openingHours: zod.string().nullish(),
-  latitude: zod.number().nullish(),
-  longitude: zod.number().nullish(),
-  website: zod.string().nullish(),
-  phone: zod.string().nullish(),
-});
-
 export const GetRestaurantStatsParams = zod.object({
   id: zod.coerce.number(),
 });

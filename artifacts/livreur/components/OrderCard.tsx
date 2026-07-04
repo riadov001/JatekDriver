@@ -2,23 +2,13 @@ import { Feather } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useColors } from "@/hooks/useColors";
+import { STATUS_LABELS } from "@/constants/orderStatus";
 import type { Order } from "@workspace/api-client-react";
 
 interface OrderCardProps {
   order: Order;
   onPress: () => void;
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: "En attente",
-  accepted: "Acceptée",
-  preparing: "En préparation",
-  ready: "Prête",
-  picked_up: "Récupérée",
-  en_route: "En route",
-  delivered: "Livrée",
-  cancelled: "Annulée",
-};
 
 function statusColor(status: string, colors: ReturnType<typeof useColors>): string {
   switch (status) {

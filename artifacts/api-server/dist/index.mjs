@@ -254677,6 +254677,7 @@ var GetRecentOrdersResponseItem = objectType({
   driverId: numberType().nullish(),
   restaurantName: stringType(),
   userName: stringType(),
+  userPhone: stringType().nullish(),
   status: enumType([
     "pending",
     "accepted",
@@ -254982,6 +254983,7 @@ var ListBackendOrdersResponseItem = objectType({
   driverId: numberType().nullish(),
   restaurantName: stringType(),
   userName: stringType(),
+  userPhone: stringType().nullish(),
   status: enumType([
     "pending",
     "accepted",
@@ -255401,6 +255403,16 @@ var GetDriverEarningsResponse = objectType({
   totalDeliveries: numberType(),
   completedToday: numberType()
 });
+var GetDriverLeaderboardParams = objectType({
+  id: coerce.number()
+});
+var GetDriverLeaderboardResponse = objectType({
+  rank: numberType(),
+  totalDrivers: numberType(),
+  weeklyEarnings: numberType(),
+  topWeeklyEarnings: numberType(),
+  percentile: numberType()
+});
 var UpdateDriverLocationParams = objectType({
   id: coerce.number()
 });
@@ -255501,6 +255513,7 @@ var ExportMyDataResponse = objectType({
       driverId: numberType().nullish(),
       restaurantName: stringType(),
       userName: stringType(),
+      userPhone: stringType().nullish(),
       status: enumType([
         "pending",
         "accepted",
@@ -255721,6 +255734,7 @@ var ListOrdersResponseItem = objectType({
   driverId: numberType().nullish(),
   restaurantName: stringType(),
   userName: stringType(),
+  userPhone: stringType().nullish(),
   status: enumType([
     "pending",
     "accepted",
@@ -255775,8 +255789,8 @@ var GetOrderResponse = objectType({
   restaurantId: numberType(),
   driverId: numberType().nullish(),
   restaurantName: stringType(),
-  restaurantAddress: stringType().nullish(),
   userName: stringType(),
+  userPhone: stringType().nullish(),
   status: enumType([
     "pending",
     "accepted",
@@ -255823,6 +255837,7 @@ var AcceptOrderDeliveryResponse = objectType({
   driverId: numberType().nullish(),
   restaurantName: stringType(),
   userName: stringType(),
+  userPhone: stringType().nullish(),
   status: enumType([
     "pending",
     "accepted",
@@ -255870,6 +255885,7 @@ var ConfirmOrderDeliveryResponse = objectType({
   driverId: numberType().nullish(),
   restaurantName: stringType(),
   userName: stringType(),
+  userPhone: stringType().nullish(),
   status: enumType([
     "pending",
     "accepted",
@@ -255902,6 +255918,15 @@ var ConfirmOrderDeliveryResponse = objectType({
   reference: stringType().nullish(),
   kitchenCode: stringType().nullish(),
   pickupCode: stringType().nullish()
+});
+var NotifyCustomerParams = objectType({
+  id: coerce.number()
+});
+var NotifyCustomerBody = objectType({
+  messageKey: enumType(["arriving", "arrived", "traffic", "calling"])
+});
+var NotifyCustomerResponse = objectType({
+  success: booleanType()
 });
 var GetOrderInvoiceParams = objectType({
   id: coerce.number()
@@ -255938,6 +255963,7 @@ var UpdateOrderStatusResponse = objectType({
   driverId: numberType().nullish(),
   restaurantName: stringType(),
   userName: stringType(),
+  userPhone: stringType().nullish(),
   status: enumType([
     "pending",
     "accepted",
@@ -255978,6 +256004,7 @@ var GetActiveOrdersResponseItem = objectType({
   driverId: numberType().nullish(),
   restaurantName: stringType(),
   userName: stringType(),
+  userPhone: stringType().nullish(),
   status: enumType([
     "pending",
     "accepted",
@@ -256019,6 +256046,7 @@ var GetAvailableOrdersResponseItem = objectType({
   driverId: numberType().nullish(),
   restaurantName: stringType(),
   userName: stringType(),
+  userPhone: stringType().nullish(),
   status: enumType([
     "pending",
     "accepted",
@@ -256254,11 +256282,6 @@ var GetRestaurantResponse = objectType({
   ice: stringType().nullish(),
   printerEmail: stringType().nullish(),
   profileCompletedAt: coerce.date().nullish(),
-  googlePlaceId: stringType().nullish(),
-  openingHours: stringType().nullish(),
-  latitude: numberType().nullish(),
-  longitude: numberType().nullish(),
-  website: stringType().nullish(),
   freeDeliveryThreshold: numberType().optional().describe("Defaulted by the API when not stored on the restaurant row.")
 });
 var UpdateRestaurantParams = objectType({
@@ -256279,12 +256302,7 @@ var UpdateRestaurantBody = objectType({
   deliveryTime: numberType().optional(),
   deliveryFee: numberType().optional(),
   minimumOrder: numberType().optional(),
-  isVerified: booleanType().optional(),
-  googlePlaceId: stringType().nullish(),
-  openingHours: stringType().nullish(),
-  latitude: numberType().nullish(),
-  longitude: numberType().nullish(),
-  website: stringType().nullish()
+  isVerified: booleanType().optional()
 });
 var UpdateRestaurantResponse = objectType({
   id: numberType(),
@@ -256311,11 +256329,6 @@ var UpdateRestaurantResponse = objectType({
   ice: stringType().nullish(),
   printerEmail: stringType().nullish(),
   profileCompletedAt: coerce.date().nullish(),
-  googlePlaceId: stringType().nullish(),
-  openingHours: stringType().nullish(),
-  latitude: numberType().nullish(),
-  longitude: numberType().nullish(),
-  website: stringType().nullish(),
   freeDeliveryThreshold: numberType().optional().describe("Defaulted by the API when not stored on the restaurant row.")
 });
 var DeleteRestaurantParams = objectType({
@@ -256357,18 +256370,6 @@ var CompleteRestaurantProfileResponse = objectType({
   printerEmail: stringType().nullish(),
   profileCompletedAt: coerce.date().nullish(),
   freeDeliveryThreshold: numberType().optional().describe("Defaulted by the API when not stored on the restaurant row.")
-});
-var SyncRestaurantPlacesParams = objectType({
-  id: coerce.number()
-});
-var SyncRestaurantPlacesResponse = objectType({
-  id: numberType(),
-  googlePlaceId: stringType().nullish(),
-  openingHours: stringType().nullish(),
-  latitude: numberType().nullish(),
-  longitude: numberType().nullish(),
-  website: stringType().nullish(),
-  phone: stringType().nullish()
 });
 var GetRestaurantStatsParams = objectType({
   id: coerce.number()
@@ -260006,8 +260007,15 @@ async function getOrderWithItems(orderId) {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
   if (!order) return null;
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
-  return { ...order, items };
+  const [customer] = await db.select({ phone: usersTable.phone }).from(usersTable).where(eq(usersTable.id, order.userId)).limit(1);
+  return { ...order, userPhone: customer?.phone ?? null, items };
 }
+var NOTIFY_CUSTOMER_MESSAGES = {
+  arriving: { title: "\u{1F6F5} Votre livreur arrive", body: "Votre livreur sera \xE0 votre adresse dans quelques minutes." },
+  arrived: { title: "\u{1F4CD} Votre livreur est arriv\xE9", body: "Votre livreur vous attend \xE0 l'adresse de livraison." },
+  traffic: { title: "\u23F1 L\xE9ger retard", body: "Votre livreur rencontre du trafic, votre commande arrive bient\xF4t." },
+  calling: { title: "\u{1F4DE} Votre livreur essaie de vous joindre", body: "Merci de rester disponible, votre livreur vous appelle." }
+};
 router6.get("/orders/active", requireAuth, async (req, res) => {
   if (req.userRole !== "admin") {
     res.status(403).json({ error: "Forbidden" });
@@ -260396,6 +260404,38 @@ router6.post("/orders/:id/accept-delivery", requireAuth, async (req, res) => {
   await pushNotification(order.userId, "order_status", "\u{1F6F5} En route !", `${driver.name} est en chemin avec votre commande de ${order.restaurantName}.`, { orderId, status: "picked_up" });
   attachOrder(driverId, orderId);
   res.json(orderWithItems);
+});
+router6.post("/orders/:id/notify-customer", requireAuth, async (req, res) => {
+  const orderId = parseInt(req.params.id, 10);
+  if (isNaN(orderId)) {
+    res.status(400).json({ error: "Invalid order id" });
+    return;
+  }
+  const parsed = NotifyCustomerBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
+  if (!order) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+  if (req.userRole !== "admin") {
+    if (!order.driverId) {
+      res.status(403).json({ error: "Order has no assigned driver" });
+      return;
+    }
+    const [drv] = await db.select().from(driversTable).where(eq(driversTable.id, order.driverId)).limit(1);
+    if (!drv || drv.userId !== req.userId) {
+      res.status(403).json({ error: "Only the assigned driver can message the customer" });
+      return;
+    }
+  }
+  const msg = NOTIFY_CUSTOMER_MESSAGES[parsed.data.messageKey];
+  await pushNotification(order.userId, "driver_message", msg.title, msg.body, { orderId });
+  publish(`order:${orderId}`, "driver_message", { orderId, messageKey: parsed.data.messageKey, ...msg });
+  res.json({ success: true });
 });
 router6.post("/orders/:id/confirm-delivery", requireAuth, async (req, res) => {
   const orderId = parseInt(req.params.id, 10);
@@ -261073,6 +261113,40 @@ router8.get("/drivers/:id/earnings", requireAuth, async (req, res) => {
     totalDeliveries: driver.totalDeliveries,
     completedToday
   });
+});
+router8.get("/drivers/:id/leaderboard", requireAuth, async (req, res) => {
+  const params = GetDriverEarningsParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const driverId = params.data.id;
+  const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, driverId)).limit(1);
+  if (!driver) {
+    res.status(404).json({ error: "Driver not found" });
+    return;
+  }
+  if (req.userRole !== "admin" && driver.userId !== req.userId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const now = /* @__PURE__ */ new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+  startOfWeek.setHours(0, 0, 0, 0);
+  const rows = await db.select({
+    driverId: driverEarningsTable.driverId,
+    total: sql`sum(${driverEarningsTable.amount})`
+  }).from(driverEarningsTable).where(gte(driverEarningsTable.createdAt, startOfWeek)).groupBy(driverEarningsTable.driverId);
+  const totals = rows.map((r) => ({ driverId: r.driverId, total: Number(r.total) || 0 }));
+  const sorted = [...totals].sort((a, b) => b.total - a.total);
+  const myEntry = totals.find((t) => t.driverId === driverId);
+  const weeklyEarnings = Math.round((myEntry?.total ?? 0) * 100) / 100;
+  const totalDrivers = Math.max(sorted.length, 1);
+  const rank = myEntry ? sorted.findIndex((t) => t.driverId === driverId) + 1 : totalDrivers;
+  const topWeeklyEarnings = Math.round((sorted[0]?.total ?? 0) * 100) / 100;
+  const percentile = totalDrivers > 0 ? Math.round((totalDrivers - rank) / totalDrivers * 100) : 0;
+  res.json({ rank, totalDrivers, weeklyEarnings, topWeeklyEarnings, percentile });
 });
 router8.get("/drivers/:id/earnings/history", requireAuth, async (req, res) => {
   const params = GetDriverEarningsParams.safeParse(req.params);

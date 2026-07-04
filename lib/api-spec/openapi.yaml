@@ -4108,6 +4108,25 @@ components:
         - totalEarnings
         - totalDeliveries
         - completedToday
+    DriverLeaderboard:
+      type: object
+      properties:
+        rank:
+          type: integer
+        totalDrivers:
+          type: integer
+        weeklyEarnings:
+          type: number
+        topWeeklyEarnings:
+          type: number
+        percentile:
+          type: integer
+      required:
+        - rank
+        - totalDrivers
+        - weeklyEarnings
+        - topWeeklyEarnings
+        - percentile
     Review:
       type: object
       properties:
@@ -4499,6 +4518,18 @@ components:
         pickupCode:
           type: string
           pattern: ^\d{4}$
+    NotifyCustomerBody:
+      type: object
+      required:
+        - messageKey
+      properties:
+        messageKey:
+          type: string
+          enum:
+            - arriving
+            - arrived
+            - traffic
+            - calling
     CompleteDriverProfileBody:
       type: object
       required:

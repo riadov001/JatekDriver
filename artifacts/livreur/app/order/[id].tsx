@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import {
   useConfirmOrderDelivery,
+  useNotifyCustomer,
   useGetOrder,
   type Order,
 } from "@workspace/api-client-react";
@@ -23,27 +24,25 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { StatusTimeline } from "@/components/StatusTimeline";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocationTracking } from "@/contexts/LocationTrackingContext";
 import { useColors } from "@/hooks/useColors";
 import { useDirections } from "@/hooks/useDirections";
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: "En attente",
-  accepted: "Acceptée",
-  preparing: "En préparation",
-  ready: "Prête",
-  picked_up: "Récupérée",
-  en_route: "En route",
-  delivered: "Livrée",
-  cancelled: "Annulée",
-};
+import { STATUS_LABELS } from "@/constants/orderStatus";
 
 const STATUS_COLOR: Record<string, string> = {
   picked_up: "#EA580C",
   en_route: "#7C3AED",
   delivered: "#10B981",
 };
+
+const QUICK_MESSAGES: { key: "arriving" | "arrived" | "traffic" | "calling"; label: string; icon: keyof typeof Feather.glyphMap }[] = [
+  { key: "arriving", label: "J'arrive bientôt", icon: "clock" },
+  { key: "arrived", label: "Je suis arrivé", icon: "map-pin" },
+  { key: "traffic", label: "Léger retard", icon: "alert-triangle" },
+  { key: "calling", label: "Je vous appelle", icon: "phone" },
+];
 
 export default function OrderDetailScreen() {
   const colors = useColors();
@@ -118,6 +117,35 @@ export default function OrderDetailScreen() {
       },
     },
   });
+
+  const notifyCustomer = useNotifyCustomer({
+    mutation: {
+      onSuccess: () => {
+        if (Platform.OS !== "web") {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        }
+      },
+      onError: () => {
+        Alert.alert("Erreur", "Impossible d'envoyer le message au client.");
+      },
+    },
+  });
+
+  const handleQuickMessage = (messageKey: "arriving" | "arrived" | "traffic" | "calling") => {
+    notifyCustomer.mutate({ id: orderId, data: { messageKey } });
+  };
+
+  const handleCallCustomer = async () => {
+    if (!order?.userPhone) {
+      Alert.alert("Numéro indisponible", "Le numéro du client n'est pas renseigné.");
+      return;
+    }
+    try {
+      await Linking.openURL(`tel:${order.userPhone}`);
+    } catch {
+      Alert.alert("Erreur", "Impossible de lancer l'appel.");
+    }
+  };
 
   const handleOpenOtpModal = () => {
     setOtpValue("");
@@ -334,6 +362,18 @@ export default function OrderDetailScreen() {
             </View>
           </View>
 
+          {/* ── Suivi de livraison ── */}
+          {isActive && (
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: colors.card, borderRadius: colors.radius, borderColor: colors.border },
+              ]}
+            >
+              <StatusTimeline status={order.status} />
+            </View>
+          )}
+
           {/* ── Client info ── */}
           <View
             style={[
@@ -341,7 +381,18 @@ export default function OrderDetailScreen() {
               { backgroundColor: colors.card, borderRadius: colors.radius, borderColor: colors.border },
             ]}
           >
-            <Text style={[styles.cardTitle, { color: colors.mutedForeground }]}>Client</Text>
+            <View style={styles.clientHeaderRow}>
+              <Text style={[styles.cardTitle, { color: colors.mutedForeground }]}>Client</Text>
+              {isActive && (
+                <Pressable
+                  onPress={handleCallCustomer}
+                  style={[styles.callBtn, { backgroundColor: colors.success + "22" }]}
+                >
+                  <Feather name="phone" size={14} color={colors.success} />
+                  <Text style={[styles.callBtnText, { color: colors.success }]}>Appeler</Text>
+                </Pressable>
+              )}
+            </View>
             <View style={styles.row}>
               <Feather name="user" size={15} color={colors.foreground} />
               <Text style={[styles.rowText, { color: colors.foreground }]}>{order.userName}</Text>
@@ -360,6 +411,25 @@ export default function OrderDetailScreen() {
                 </Text>
               </View>
             ) : null}
+
+            {isActive && (
+              <View style={styles.quickMsgRow}>
+                {QUICK_MESSAGES.map((qm) => (
+                  <Pressable
+                    key={qm.key}
+                    onPress={() => handleQuickMessage(qm.key)}
+                    disabled={notifyCustomer.isPending}
+                    style={[
+                      styles.quickMsgChip,
+                      { backgroundColor: colors.background, borderColor: colors.border, borderRadius: colors.radius },
+                    ]}
+                  >
+                    <Feather name={qm.icon} size={13} color={colors.primary} />
+                    <Text style={[styles.quickMsgText, { color: colors.foreground }]}>{qm.label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* ── Articles ── */}
@@ -667,6 +737,26 @@ const styles = StyleSheet.create({
   /* Cards */
   card: { padding: 16, borderWidth: 1, gap: 10 },
   cardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 },
+  clientHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  callBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  callBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
+  quickMsgRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  quickMsgChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+  },
+  quickMsgText: { fontFamily: "Inter_500Medium", fontSize: 12 },
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
   rowText: { fontFamily: "Inter_500Medium", fontSize: 14 },
   itemRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 3 },

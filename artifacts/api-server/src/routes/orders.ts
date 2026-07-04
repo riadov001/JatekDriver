@@ -23,6 +23,7 @@ import {
   UpdateOrderStatusParams,
   UpdateOrderStatusBody,
   ListOrdersQueryParams,
+  NotifyCustomerBody,
 } from "@workspace/api-zod";
 import { publish } from "../lib/sse";
 import * as tracking from "../lib/trackingService";
@@ -64,8 +65,20 @@ async function getOrderWithItems(orderId: number) {
   if (!order) return null;
 
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
-  return { ...order, items };
+  const [customer] = await db
+    .select({ phone: usersTable.phone })
+    .from(usersTable)
+    .where(eq(usersTable.id, order.userId))
+    .limit(1);
+  return { ...order, userPhone: customer?.phone ?? null, items };
 }
+
+const NOTIFY_CUSTOMER_MESSAGES: Record<string, { title: string; body: string }> = {
+  arriving: { title: "🛵 Votre livreur arrive", body: "Votre livreur sera à votre adresse dans quelques minutes." },
+  arrived: { title: "📍 Votre livreur est arrivé", body: "Votre livreur vous attend à l'adresse de livraison." },
+  traffic: { title: "⏱ Léger retard", body: "Votre livreur rencontre du trafic, votre commande arrive bientôt." },
+  calling: { title: "📞 Votre livreur essaie de vous joindre", body: "Merci de rester disponible, votre livreur vous appelle." },
+};
 
 router.get("/orders/active", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
   if (req.userRole !== "admin") {
@@ -602,6 +615,40 @@ router.post("/orders/:id/accept-delivery", requireAuth, async (req: AuthedReques
   tracking.attachOrder(driverId, orderId);
 
   res.json(orderWithItems);
+});
+
+/**
+ * Driver sends a quick preset message to the customer (call/chat lite).
+ * Only the assigned driver (or admin) may notify the customer, and only
+ * while the order is actively out for delivery.
+ */
+router.post("/orders/:id/notify-customer", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
+  const orderId = parseInt(req.params.id, 10);
+  if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
+
+  const parsed = NotifyCustomerBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
+  if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+
+  if (req.userRole !== "admin") {
+    if (!order.driverId) { res.status(403).json({ error: "Order has no assigned driver" }); return; }
+    const [drv] = await db.select().from(driversTable).where(eq(driversTable.id, order.driverId)).limit(1);
+    if (!drv || drv.userId !== req.userId) {
+      res.status(403).json({ error: "Only the assigned driver can message the customer" });
+      return;
+    }
+  }
+
+  const msg = NOTIFY_CUSTOMER_MESSAGES[parsed.data.messageKey];
+  await pushNotification(order.userId, "driver_message", msg.title, msg.body, { orderId });
+  publish(`order:${orderId}`, "driver_message", { orderId, messageKey: parsed.data.messageKey, ...msg });
+
+  res.json({ success: true });
 });
 
 /**

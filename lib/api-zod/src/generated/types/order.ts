@@ -16,6 +16,8 @@ export interface Order {
   driverId?: number | null;
   restaurantName: string;
   userName: string;
+  /** @nullable */
+  userPhone?: string | null;
   status: OrderStatus;
   subtotal: number;
   deliveryFee: number;
