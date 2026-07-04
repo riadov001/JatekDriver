@@ -1376,6 +1376,28 @@ paths:
       security:
         - bearerAuth: []
       description: JWT required. Driver owner or admin only.
+  /drivers/{id}/leaderboard:
+    get:
+      operationId: getDriverLeaderboard
+      tags:
+        - drivers
+      summary: Get driver ranking among all drivers this week
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Driver leaderboard position
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DriverLeaderboard"
+      security:
+        - bearerAuth: []
+      description: JWT required. Driver owner or admin only.
   /drivers/{id}/location:
     patch:
       operationId: updateDriverLocation
@@ -1936,6 +1958,56 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: Order is not in transit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /orders/{id}/notify-customer:
+    post:
+      operationId: notifyCustomer
+      tags:
+        - orders
+      summary: Driver sends a quick preset message to the customer (push notification)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotifyCustomerBody"
+      responses:
+        "200":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                required:
+                  - success
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Order not found
           content:
             application/json:
               schema:
@@ -3828,6 +3900,10 @@ components:
           type: string
         userName:
           type: string
+        userPhone:
+          type:
+            - string
+            - "null"
         status:
           type: string
           enum:
