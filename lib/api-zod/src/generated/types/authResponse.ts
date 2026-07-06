@@ -5,9 +5,11 @@
  * Jatek Food Delivery API
  * OpenAPI spec version: 0.1.0
  */
+import type { Driver } from "./driver";
 import type { User } from "./user";
 
 export interface AuthResponse {
   token: string;
   user: User;
+  driver?: Driver;
 }

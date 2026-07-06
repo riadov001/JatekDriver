@@ -737,7 +737,7 @@ router.patch("/backend/categories/:name", requireAuth, async (req: AuthedRequest
   if (!ctx) return;
   if (!["super_admin", "admin"].includes(ctx.role)) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const oldName = decodeURIComponent(req.params.name);
+  const oldName = decodeURIComponent(String(req.params.name));
   const newName = String(req.body?.name || "").trim();
   if (!newName) { res.status(400).json({ error: "New name required" }); return; }
 
@@ -766,7 +766,7 @@ router.delete("/backend/categories/:name", requireAuth, async (req: AuthedReques
   if (!ctx) return;
   if (!["super_admin", "admin"].includes(ctx.role)) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const name = decodeURIComponent(req.params.name);
+  const name = decodeURIComponent(String(req.params.name));
 
   // Check if any restaurant is using this category
   const inUse = await db.select({ id: restaurantsTable.id }).from(restaurantsTable).where(eq(restaurantsTable.category, name));

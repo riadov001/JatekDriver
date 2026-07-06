@@ -59,9 +59,41 @@ export interface User {
   assignedShopId?: number | null;
 }
 
+export interface Driver {
+  id: number;
+  userId: number;
+  name: string;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  vehicleType?: string | null;
+  isAvailable: boolean;
+  totalDeliveries: number;
+  /** @nullable */
+  rating?: number | null;
+  createdAt: string;
+  /** @nullable */
+  vehiclePlate?: string | null;
+  /** @nullable */
+  nationalId?: string | null;
+  /** @nullable */
+  licenseNumber?: string | null;
+  /** @nullable */
+  photoUrl?: string | null;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  /** @nullable */
+  locationUpdatedAt?: string | null;
+  /** @nullable */
+  profileCompletedAt?: string | null;
+}
+
 export interface AuthResponse {
   token: string;
   user: User;
+  driver?: Driver;
 }
 
 /**
@@ -308,37 +340,6 @@ export const UpdateOrderStatusBodyStatus = {
 export interface UpdateOrderStatusBody {
   status: UpdateOrderStatusBodyStatus;
   driverId?: number;
-}
-
-export interface Driver {
-  id: number;
-  userId: number;
-  name: string;
-  /** @nullable */
-  phone?: string | null;
-  /** @nullable */
-  vehicleType?: string | null;
-  isAvailable: boolean;
-  totalDeliveries: number;
-  /** @nullable */
-  rating?: number | null;
-  createdAt: string;
-  /** @nullable */
-  vehiclePlate?: string | null;
-  /** @nullable */
-  nationalId?: string | null;
-  /** @nullable */
-  licenseNumber?: string | null;
-  /** @nullable */
-  photoUrl?: string | null;
-  /** @nullable */
-  latitude?: number | null;
-  /** @nullable */
-  longitude?: number | null;
-  /** @nullable */
-  locationUpdatedAt?: string | null;
-  /** @nullable */
-  profileCompletedAt?: string | null;
 }
 
 export interface UpdateDriverBody {

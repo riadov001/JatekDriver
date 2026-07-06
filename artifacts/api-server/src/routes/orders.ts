@@ -514,7 +514,7 @@ router.patch("/orders/:id/status", requireAuth, async (req: AuthedRequest, res):
  * and need an initial state before subscribing to the SSE channel.
  */
 router.get("/orders/:id/tracking", attachAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid order id" }); return; }
 
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, id)).limit(1);
@@ -554,7 +554,7 @@ router.get("/orders/:id/tracking", attachAuth, async (req: AuthedRequest, res): 
 
 /** Driver accepts a "ready" order — assigns themselves to it */
 router.post("/orders/:id/accept-delivery", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
 
   const { driverId } = req.body;
@@ -623,7 +623,7 @@ router.post("/orders/:id/accept-delivery", requireAuth, async (req: AuthedReques
  * while the order is actively out for delivery.
  */
 router.post("/orders/:id/notify-customer", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
 
   const parsed = NotifyCustomerBody.safeParse(req.body);
@@ -663,7 +663,7 @@ router.post("/orders/:id/notify-customer", requireAuth, async (req: AuthedReques
  *   7. Broadcasts SSE events to all relevant channels
  */
 router.post("/orders/:id/confirm-delivery", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
 
   const code = typeof req.body?.otp === "string" ? req.body.otp.trim()
@@ -778,7 +778,7 @@ router.post("/orders/:id/confirm-delivery", requireAuth, async (req: AuthedReque
  * the query string so a freshly opened browser tab can fetch it.
  */
 router.get("/orders/:id/receipt", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).send("Invalid order id"); return; }
 
   const order = await getOrderWithItems(orderId);
@@ -856,7 +856,7 @@ router.get("/orders/:id/receipt", requireAuth, async (req: AuthedRequest, res): 
 
 /** Customer rates their driver after delivery */
 router.post("/orders/:id/rate-driver", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
 
   const { rating, comment } = req.body;
@@ -894,7 +894,7 @@ router.post("/orders/:id/rate-driver", requireAuth, async (req: AuthedRequest, r
 
 /** Driver rates customer */
 router.post("/orders/:id/rate-customer", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
 
   const { rating } = req.body;
@@ -927,7 +927,7 @@ router.post("/orders/:id/rate-customer", requireAuth, async (req: AuthedRequest,
 
 /** Reorder — clone items from a previous order into a new pending order */
 router.post("/orders/:id/reorder", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
 
   const userId = req.userId!;

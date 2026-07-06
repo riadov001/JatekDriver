@@ -21,7 +21,7 @@ router.get("/notifications", requireAuth, async (req: AuthedRequest, res): Promi
 
 /** Mark a notification as read */
 router.patch("/notifications/:id/read", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [notif] = await db
@@ -46,7 +46,7 @@ router.patch("/notifications/read-all", requireAuth, async (req: AuthedRequest, 
 
 /** Delete a notification */
 router.delete("/notifications/:id", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   await db
     .delete(notificationsTable)

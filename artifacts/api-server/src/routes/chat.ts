@@ -8,7 +8,7 @@ const router: IRouter = Router();
 
 /** Send a message in the order chat */
 router.post("/orders/:id/chat", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
 
   const { message } = req.body;
@@ -60,7 +60,7 @@ router.post("/orders/:id/chat", requireAuth, async (req: AuthedRequest, res): Pr
 
 /** Get all messages for an order */
 router.get("/orders/:id/chat", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
 
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);

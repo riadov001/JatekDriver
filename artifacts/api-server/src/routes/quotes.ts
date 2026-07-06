@@ -111,7 +111,7 @@ async function canAccessQuote(req: AuthedRequest, quote: { userId: number; resta
 }
 
 router.get("/quotes/:id", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const [quote] = await db.select().from(quotesTable).where(eq(quotesTable.id, id)).limit(1);
   if (!quote) { res.status(404).json({ error: "Not found" }); return; }
@@ -123,7 +123,7 @@ router.get("/quotes/:id", requireAuth, async (req: AuthedRequest, res): Promise<
 });
 
 router.patch("/quotes/:id", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const parsed = parseUpdateBody(req.body);
@@ -170,7 +170,7 @@ router.patch("/quotes/:id", requireAuth, async (req: AuthedRequest, res): Promis
 
 /** HTML invoice page for a delivered/accepted order — restricted to order owner, owning merchant, or admin. */
 router.get("/orders/:id/invoice", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).send("Invalid id"); return; }
 
   const { ordersTable, orderItemsTable } = await import("@workspace/db");
@@ -278,7 +278,7 @@ router.get("/orders/:id/invoice", requireAuth, async (req: AuthedRequest, res): 
 
 /** HTML quote document — restricted to quote owner, owning merchant, or admin. */
 router.get("/quotes/:id/pdf", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).send("Invalid id"); return; }
   const [quote] = await db.select().from(quotesTable).where(eq(quotesTable.id, id)).limit(1);
   if (!quote) { res.status(404).send("Not found"); return; }

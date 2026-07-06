@@ -121,7 +121,7 @@ router.patch("/drivers/:id", requireAuth, async (req: AuthedRequest, res): Promi
  * Sets `profileCompletedAt`, which gates the ability to accept deliveries.
  */
 router.post("/drivers/:id/complete-profile", requireAuth, async (req: any, res): Promise<void> => {
-  const id = parseInt(req.params.id ?? "", 10);
+  const id = parseInt(String(req.params.id ?? ""), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [existing] = await db.select().from(driversTable).where(eq(driversTable.id, id)).limit(1);
@@ -158,7 +158,7 @@ router.post("/drivers/:id/complete-profile", requireAuth, async (req: any, res):
 });
 
 router.patch("/drivers/:id/location", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid driver id" }); return; }
 
   const { latitude, longitude, destLat, destLng } = req.body ?? {};
@@ -243,7 +243,7 @@ router.patch("/drivers/:id/location", requireAuth, async (req: AuthedRequest, re
  * watchdog doesn't flag them as offline.
  */
 router.post("/drivers/:id/heartbeat", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid driver id" }); return; }
 
   const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, id)).limit(1);
@@ -258,7 +258,7 @@ router.post("/drivers/:id/heartbeat", requireAuth, async (req: AuthedRequest, re
 });
 
 router.get("/drivers/:id/location", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid driver id" }); return; }
 
   const [driver] = await db.select().from(driversTable).where(eq(driversTable.id, id)).limit(1);

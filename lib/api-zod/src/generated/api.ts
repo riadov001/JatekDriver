@@ -158,6 +158,27 @@ export const LoginResponse = zod.object({
     createdAt: zod.coerce.date(),
     assignedShopId: zod.number().nullish(),
   }),
+  driver: zod
+    .object({
+      id: zod.number(),
+      userId: zod.number(),
+      name: zod.string(),
+      phone: zod.string().nullish(),
+      vehicleType: zod.string().nullish(),
+      isAvailable: zod.boolean(),
+      totalDeliveries: zod.number(),
+      rating: zod.number().nullish(),
+      createdAt: zod.coerce.date(),
+      vehiclePlate: zod.string().nullish(),
+      nationalId: zod.string().nullish(),
+      licenseNumber: zod.string().nullish(),
+      photoUrl: zod.string().nullish(),
+      latitude: zod.number().nullish(),
+      longitude: zod.number().nullish(),
+      locationUpdatedAt: zod.coerce.date().nullish(),
+      profileCompletedAt: zod.coerce.date().nullish(),
+    })
+    .optional(),
 });
 
 /**
@@ -299,6 +320,27 @@ export const VerifyOtpResponse = zod.object({
     createdAt: zod.coerce.date(),
     assignedShopId: zod.number().nullish(),
   }),
+  driver: zod
+    .object({
+      id: zod.number(),
+      userId: zod.number(),
+      name: zod.string(),
+      phone: zod.string().nullish(),
+      vehicleType: zod.string().nullish(),
+      isAvailable: zod.boolean(),
+      totalDeliveries: zod.number(),
+      rating: zod.number().nullish(),
+      createdAt: zod.coerce.date(),
+      vehiclePlate: zod.string().nullish(),
+      nationalId: zod.string().nullish(),
+      licenseNumber: zod.string().nullish(),
+      photoUrl: zod.string().nullish(),
+      latitude: zod.number().nullish(),
+      longitude: zod.number().nullish(),
+      locationUpdatedAt: zod.coerce.date().nullish(),
+      profileCompletedAt: zod.coerce.date().nullish(),
+    })
+    .optional(),
 });
 
 /**
@@ -433,6 +475,27 @@ export const BackendLoginResponse = zod.object({
     createdAt: zod.coerce.date(),
     assignedShopId: zod.number().nullish(),
   }),
+  driver: zod
+    .object({
+      id: zod.number(),
+      userId: zod.number(),
+      name: zod.string(),
+      phone: zod.string().nullish(),
+      vehicleType: zod.string().nullish(),
+      isAvailable: zod.boolean(),
+      totalDeliveries: zod.number(),
+      rating: zod.number().nullish(),
+      createdAt: zod.coerce.date(),
+      vehiclePlate: zod.string().nullish(),
+      nationalId: zod.string().nullish(),
+      licenseNumber: zod.string().nullish(),
+      photoUrl: zod.string().nullish(),
+      latitude: zod.number().nullish(),
+      longitude: zod.number().nullish(),
+      locationUpdatedAt: zod.coerce.date().nullish(),
+      profileCompletedAt: zod.coerce.date().nullish(),
+    })
+    .optional(),
 });
 
 /**

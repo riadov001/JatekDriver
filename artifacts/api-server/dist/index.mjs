@@ -254748,7 +254748,26 @@ var LoginResponse = objectType({
     loyaltyPoints: numberType(),
     createdAt: coerce.date(),
     assignedShopId: numberType().nullish()
-  })
+  }),
+  driver: objectType({
+    id: numberType(),
+    userId: numberType(),
+    name: stringType(),
+    phone: stringType().nullish(),
+    vehicleType: stringType().nullish(),
+    isAvailable: booleanType(),
+    totalDeliveries: numberType(),
+    rating: numberType().nullish(),
+    createdAt: coerce.date(),
+    vehiclePlate: stringType().nullish(),
+    nationalId: stringType().nullish(),
+    licenseNumber: stringType().nullish(),
+    photoUrl: stringType().nullish(),
+    latitude: numberType().nullish(),
+    longitude: numberType().nullish(),
+    locationUpdatedAt: coerce.date().nullish(),
+    profileCompletedAt: coerce.date().nullish()
+  }).optional()
 });
 var LogoutResponse = objectType({
   success: booleanType()
@@ -254848,7 +254867,26 @@ var VerifyOtpResponse = objectType({
     loyaltyPoints: numberType(),
     createdAt: coerce.date(),
     assignedShopId: numberType().nullish()
-  })
+  }),
+  driver: objectType({
+    id: numberType(),
+    userId: numberType(),
+    name: stringType(),
+    phone: stringType().nullish(),
+    vehicleType: stringType().nullish(),
+    isAvailable: booleanType(),
+    totalDeliveries: numberType(),
+    rating: numberType().nullish(),
+    createdAt: coerce.date(),
+    vehiclePlate: stringType().nullish(),
+    nationalId: stringType().nullish(),
+    licenseNumber: stringType().nullish(),
+    photoUrl: stringType().nullish(),
+    latitude: numberType().nullish(),
+    longitude: numberType().nullish(),
+    locationUpdatedAt: coerce.date().nullish(),
+    profileCompletedAt: coerce.date().nullish()
+  }).optional()
 });
 var ListBackendCategoriesResponseItem = objectType({
   name: stringType(),
@@ -254948,7 +254986,26 @@ var BackendLoginResponse = objectType({
     loyaltyPoints: numberType(),
     createdAt: coerce.date(),
     assignedShopId: numberType().nullish()
-  })
+  }),
+  driver: objectType({
+    id: numberType(),
+    userId: numberType(),
+    name: stringType(),
+    phone: stringType().nullish(),
+    vehicleType: stringType().nullish(),
+    isAvailable: booleanType(),
+    totalDeliveries: numberType(),
+    rating: numberType().nullish(),
+    createdAt: coerce.date(),
+    vehiclePlate: stringType().nullish(),
+    nationalId: stringType().nullish(),
+    licenseNumber: stringType().nullish(),
+    photoUrl: stringType().nullish(),
+    latitude: numberType().nullish(),
+    longitude: numberType().nullish(),
+    locationUpdatedAt: coerce.date().nullish(),
+    profileCompletedAt: coerce.date().nullish()
+  }).optional()
 });
 var BackendMeResponse = objectType({
   user: objectType({
@@ -259537,7 +259594,7 @@ router3.get("/restaurants/:id", async (req, res) => {
 });
 router3.patch("/restaurants/:id", requireRole("admin", "restaurant_owner"), async (req, res) => {
   if (req.userRole !== "admin") {
-    const idParam = parseInt(req.params.id ?? "", 10);
+    const idParam = parseInt(String(req.params.id ?? ""), 10);
     if (Number.isNaN(idParam)) {
       res.status(400).json({ error: "Invalid id" });
       return;
@@ -259924,7 +259981,7 @@ router5.get("/notifications", requireAuth, async (req, res) => {
   res.json({ notifications, unreadCount });
 });
 router5.patch("/notifications/:id/read", requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -259941,7 +259998,7 @@ router5.patch("/notifications/read-all", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 router5.delete("/notifications/:id", requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -260326,7 +260383,7 @@ router6.patch("/orders/:id/status", requireAuth, async (req, res) => {
   res.json(orderWithItems);
 });
 router6.get("/orders/:id/tracking", attachAuth, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid order id" });
     return;
@@ -260357,7 +260414,7 @@ router6.get("/orders/:id/tracking", attachAuth, async (req, res) => {
   });
 });
 router6.post("/orders/:id/accept-delivery", requireAuth, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) {
     res.status(400).json({ error: "Invalid order id" });
     return;
@@ -260406,7 +260463,7 @@ router6.post("/orders/:id/accept-delivery", requireAuth, async (req, res) => {
   res.json(orderWithItems);
 });
 router6.post("/orders/:id/notify-customer", requireAuth, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) {
     res.status(400).json({ error: "Invalid order id" });
     return;
@@ -260438,7 +260495,7 @@ router6.post("/orders/:id/notify-customer", requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 router6.post("/orders/:id/confirm-delivery", requireAuth, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) {
     res.status(400).json({ error: "Invalid order id" });
     return;
@@ -260522,7 +260579,7 @@ router6.post("/orders/:id/confirm-delivery", requireAuth, async (req, res) => {
   res.json({ ...orderWithItems, driverEarning });
 });
 router6.get("/orders/:id/receipt", requireAuth, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) {
     res.status(400).send("Invalid order id");
     return;
@@ -260597,7 +260654,7 @@ router6.get("/orders/:id/receipt", requireAuth, async (req, res) => {
   res.send(html);
 });
 router6.post("/orders/:id/rate-driver", requireAuth, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) {
     res.status(400).json({ error: "Invalid order id" });
     return;
@@ -260636,7 +260693,7 @@ router6.post("/orders/:id/rate-driver", requireAuth, async (req, res) => {
   res.json(updated);
 });
 router6.post("/orders/:id/rate-customer", requireAuth, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) {
     res.status(400).json({ error: "Invalid order id" });
     return;
@@ -260673,7 +260730,7 @@ router6.post("/orders/:id/rate-customer", requireAuth, async (req, res) => {
   res.json(updated);
 });
 router6.post("/orders/:id/reorder", requireAuth, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) {
     res.status(400).json({ error: "Invalid order id" });
     return;
@@ -260933,7 +260990,7 @@ router8.patch("/drivers/:id", requireAuth, async (req, res) => {
   res.json(driver);
 });
 router8.post("/drivers/:id/complete-profile", requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id ?? "", 10);
+  const id = parseInt(String(req.params.id ?? ""), 10);
   if (Number.isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -260975,7 +261032,7 @@ router8.post("/drivers/:id/complete-profile", requireAuth, async (req, res) => {
   res.json(updated);
 });
 router8.patch("/drivers/:id/location", requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid driver id" });
     return;
@@ -261032,7 +261089,7 @@ router8.patch("/drivers/:id/location", requireAuth, async (req, res) => {
   });
 });
 router8.post("/drivers/:id/heartbeat", requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid driver id" });
     return;
@@ -261050,7 +261107,7 @@ router8.post("/drivers/:id/heartbeat", requireAuth, async (req, res) => {
   res.json({ alive: true, ts: Date.now() });
 });
 router8.get("/drivers/:id/location", requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid driver id" });
     return;
@@ -261847,7 +261904,7 @@ async function canAccessQuote(req, quote) {
   return false;
 }
 router18.get("/quotes/:id", requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -261864,7 +261921,7 @@ router18.get("/quotes/:id", requireAuth, async (req, res) => {
   res.json(quote);
 });
 router18.patch("/quotes/:id", requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -261912,7 +261969,7 @@ router18.patch("/quotes/:id", requireAuth, async (req, res) => {
   res.json(quote);
 });
 router18.get("/orders/:id/invoice", requireAuth, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) {
     res.status(400).send("Invalid id");
     return;
@@ -262021,7 +262078,7 @@ router18.get("/orders/:id/invoice", requireAuth, async (req, res) => {
 </body></html>`);
 });
 router18.get("/quotes/:id/pdf", requireAuth, async (req, res) => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).send("Invalid id");
     return;
@@ -262819,7 +262876,7 @@ router19.patch("/backend/categories/:name", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const oldName = decodeURIComponent(req.params.name);
+  const oldName = decodeURIComponent(String(req.params.name));
   const newName = String(req.body?.name || "").trim();
   if (!newName) {
     res.status(400).json({ error: "New name required" });
@@ -262853,7 +262910,7 @@ router19.delete("/backend/categories/:name", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const name = decodeURIComponent(req.params.name);
+  const name = decodeURIComponent(String(req.params.name));
   const inUse = await db.select({ id: restaurantsTable.id }).from(restaurantsTable).where(eq(restaurantsTable.category, name));
   if (inUse.length > 0) {
     res.status(409).json({ error: `Cette cat\xE9gorie est utilis\xE9e par ${inUse.length} restaurant(s). R\xE9affectez-les d'abord.` });
@@ -263323,7 +263380,7 @@ router21.patch("/promo-codes/:id", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -263343,7 +263400,7 @@ router21.delete("/promo-codes/:id", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) {
     res.status(400).json({ error: "Invalid id" });
     return;
@@ -263359,7 +263416,7 @@ init_src();
 init_drizzle_orm();
 var router22 = (0, import_express22.Router)();
 router22.post("/orders/:id/chat", requireAuth, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) {
     res.status(400).json({ error: "Invalid order id" });
     return;
@@ -263403,7 +263460,7 @@ router22.post("/orders/:id/chat", requireAuth, async (req, res) => {
   res.status(201).json(msg);
 });
 router22.get("/orders/:id/chat", requireAuth, async (req, res) => {
-  const orderId = parseInt(req.params.id, 10);
+  const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) {
     res.status(400).json({ error: "Invalid order id" });
     return;

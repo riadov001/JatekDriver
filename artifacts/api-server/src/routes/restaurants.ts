@@ -139,7 +139,7 @@ router.get("/restaurants/:id", async (req, res): Promise<void> => {
 router.patch("/restaurants/:id", requireRole("admin", "restaurant_owner"), async (req: AuthedRequest, res): Promise<void> => {
   // Ownership check: non-admin owners may only modify their own restaurant.
   if (req.userRole !== "admin") {
-    const idParam = parseInt(req.params.id ?? "", 10);
+    const idParam = parseInt(String(req.params.id ?? ""), 10);
     if (Number.isNaN(idParam)) {
       res.status(400).json({ error: "Invalid id" });
       return;

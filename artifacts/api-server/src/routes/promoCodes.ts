@@ -136,7 +136,7 @@ router.patch("/promo-codes/:id", requireAuth, async (req: AuthedRequest, res): P
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const allowed = ["description", "type", "value", "minOrderAmount", "maxUses", "maxUsesPerUser", "firstOrderOnly", "isActive", "expiresAt"];
   const updates: Record<string, unknown> = {};
@@ -152,7 +152,7 @@ router.delete("/promo-codes/:id", requireAuth, async (req: AuthedRequest, res): 
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   await db.delete(promoCodesTable).where(eq(promoCodesTable.id, id));
   res.json({ success: true });
