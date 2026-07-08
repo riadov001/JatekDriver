@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "vite dev",
+    "dev": "VITE_API_URL=${BACKEND_BASE_URL_API:-} vite dev",
     "build": "vite build",
     "preview": "vite preview",
     "serve": "node server/serve.js",

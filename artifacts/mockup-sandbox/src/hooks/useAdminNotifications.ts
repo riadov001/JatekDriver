@@ -1,13 +1,15 @@
 import { useEffect, useRef } from "react";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
+const API_BASE = (import.meta.env.VITE_API_URL ?? "")
+  .replace(/\/api\/?$/, "")
+  .replace(/\/$/, "");
 
 function getToken(): string | null {
   return localStorage.getItem("jatek_backend_token");
 }
 
 function getApiBase(): string {
-  if (API_BASE) return API_BASE.replace(/\/$/, "");
+  if (API_BASE) return API_BASE;
   return window.location.origin;
 }
 

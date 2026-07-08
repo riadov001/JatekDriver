@@ -64,13 +64,26 @@ async function getOrderWithItems(orderId: number) {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
   if (!order) return null;
 
-  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
-  const [customer] = await db
-    .select({ phone: usersTable.phone })
-    .from(usersTable)
-    .where(eq(usersTable.id, order.userId))
-    .limit(1);
-  return { ...order, userPhone: customer?.phone ?? null, items };
+  const [items, customerRow, restaurantRow] = await Promise.all([
+    db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId)),
+    db.select({ phone: usersTable.phone }).from(usersTable).where(eq(usersTable.id, order.userId)).limit(1),
+    db.select({
+      address: restaurantsTable.address,
+      phone: restaurantsTable.phone,
+      latitude: restaurantsTable.latitude,
+      longitude: restaurantsTable.longitude,
+    }).from(restaurantsTable).where(eq(restaurantsTable.id, order.restaurantId)).limit(1),
+  ]);
+
+  return {
+    ...order,
+    userPhone: customerRow[0]?.phone ?? null,
+    restaurantAddress: restaurantRow[0]?.address ?? null,
+    restaurantPhone: restaurantRow[0]?.phone ?? null,
+    restaurantLat: restaurantRow[0]?.latitude ?? null,
+    restaurantLng: restaurantRow[0]?.longitude ?? null,
+    items,
+  };
 }
 
 const NOTIFY_CUSTOMER_MESSAGES: Record<string, { title: string; body: string }> = {

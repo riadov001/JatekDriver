@@ -27,14 +27,19 @@ import { storage } from "@/lib/storage";
 const REMOTE_CONFIG_CACHE_KEY = "jatek_remote_config";
 
 /**
- * Bootstrap URL — used to fetch the remote config on first launch.
- * Priority: EXPO_PUBLIC_API_URL > EXPO_PUBLIC_API_DOMAIN > production URL.
+ * Bootstrap URL — resolved at bundle time.
+ * Priority: EXPO_PUBLIC_BACKEND_BASE_URL_API > EXPO_PUBLIC_API_URL > EXPO_PUBLIC_API_DOMAIN > production fallback.
+ * In dev the start script maps BACKEND_BASE_URL_API → both EXPO_PUBLIC_* vars.
+ * For EAS builds set the EAS secret EXPO_PUBLIC_BACKEND_BASE_URL_API (must keep EXPO_PUBLIC_ prefix so Expo bakes it in).
  */
-const BOOTSTRAP_URL = process.env.EXPO_PUBLIC_API_URL
-  ? process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, "")
-  : process.env.EXPO_PUBLIC_API_DOMAIN
-    ? `https://${process.env.EXPO_PUBLIC_API_DOMAIN}`
-    : "https://ma.jatek.app";
+const BOOTSTRAP_URL = (
+  process.env.EXPO_PUBLIC_BACKEND_BASE_URL_API
+  || process.env.EXPO_PUBLIC_API_URL
+  || (process.env.EXPO_PUBLIC_API_DOMAIN ? `https://${process.env.EXPO_PUBLIC_API_DOMAIN}` : "")
+  || "https://ma.jatek.app"
+)
+  .replace(/\/api\/?$/, "")
+  .replace(/\/+$/, "");
 
 setBaseUrl(BOOTSTRAP_URL);
 

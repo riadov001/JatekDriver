@@ -7,7 +7,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://567a2c3b-7f1d-41eb-adbf-e18a35f5b162-00-1u1l234v05cz3.riker.replit.dev/api"
+        "EXPO_PUBLIC_BACKEND_BASE_URL_API": "REPLACE_WITH_YOUR_BACKEND_URL"
       }
     },
     "preview": {
@@ -16,7 +16,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://567a2c3b-7f1d-41eb-adbf-e18a35f5b162-00-1u1l234v05cz3.riker.replit.dev/api"
+        "EXPO_PUBLIC_BACKEND_BASE_URL_API": "REPLACE_WITH_YOUR_BACKEND_URL"
       }
     },
     "production": {
@@ -25,7 +25,7 @@
       },
       "ios": {},
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://ma.jatek.app"
+        "EXPO_PUBLIC_BACKEND_BASE_URL_API": "https://ma.jatek.app"
       }
     }
   },
