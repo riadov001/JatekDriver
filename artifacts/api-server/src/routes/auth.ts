@@ -69,39 +69,70 @@ router.post("/auth/register", async (req, res): Promise<void> => {
   res.status(201).json({ token, user: safeUser });
 });
 
-// ─── Login (email/password) ──────────────────────────────────────────────────
+// ─── Login (phone OR email + password) ───────────────────────────────────────
 router.post("/auth/login", async (req, res): Promise<void> => {
-  const parsed = LoginBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+  const { email, phone, password } = req.body ?? {};
+
+  if (!password || typeof password !== "string") {
+    res.status(400).json({ error: "password is required" });
     return;
   }
 
-  const { email, password } = parsed.data;
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  let user: typeof usersTable.$inferSelect | undefined;
+
+  // Phone-based login: look up by normalized phone number
+  if (phone && typeof phone === "string" && phone.trim().length >= 7) {
+    const normalized = normalizePhone(phone.trim());
+    const [byPhone] = await db.select().from(usersTable)
+      .where(eq(usersTable.phone, normalized)).limit(1);
+    user = byPhone;
+  }
+
+  // Email-based login (fallback / explicit)
+  if (!user && email && typeof email === "string" && email.includes("@")) {
+    const [byEmail] = await db.select().from(usersTable)
+      .where(eq(usersTable.email, email.trim().toLowerCase())).limit(1);
+    user = byEmail;
+  }
+
   if (!user) {
-    res.status(401).json({ error: "Invalid email or password" });
+    res.status(401).json({ error: "Invalid credentials" });
     return;
   }
 
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) {
-    res.status(401).json({ error: "Invalid email or password" });
+    res.status(401).json({ error: "Invalid credentials" });
     return;
   }
 
-  // Auto-heal: if driver user has no driver profile, create it
+  if (!user.isActive) {
+    res.status(403).json({ error: "Account disabled. Contact your administrator." });
+    return;
+  }
+
+  // Auto-heal: if driver user has no driver profile, create it automatically.
   let driverProfile: typeof driversTable.$inferSelect | null = null;
   if (user.role === "driver") {
-    const [existing] = await db.select().from(driversTable).where(eq(driversTable.userId, user.id)).limit(1);
-    if (!existing) {
-      const [created] = await db.insert(driversTable).values({
-        userId: user.id, name: user.name, phone: user.phone ?? null,
-        isAvailable: true, totalDeliveries: 0,
-      }).returning();
-      driverProfile = created ?? null;
-    } else {
-      driverProfile = existing;
+    try {
+      const [existing] = await db.select().from(driversTable)
+        .where(eq(driversTable.userId, user.id)).limit(1);
+      if (!existing) {
+        const [created] = await db.insert(driversTable).values({
+          userId: user.id,
+          name: user.name,
+          phone: user.phone ?? null,
+          isAvailable: true,
+          totalDeliveries: 0,
+          totalEarnings: 0,
+        }).returning();
+        driverProfile = created ?? null;
+        logger.info({ userId: user.id }, "auto-heal: driver profile created on login");
+      } else {
+        driverProfile = existing;
+      }
+    } catch (err) {
+      logger.error({ userId: user.id, err }, "auto-heal: failed to create driver profile");
     }
   }
 

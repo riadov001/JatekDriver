@@ -10,6 +10,10 @@ export const reviewsTable = pgTable("reviews", {
   userName: text("user_name").notNull(),
   rating: integer("rating").notNull(),
   comment: text("comment"),
+  /** Reply from the restaurant owner, displayed publicly under the review. */
+  ownerReply: text("owner_reply"),
+  /** Timestamp when the owner posted their reply. */
+  ownerRepliedAt: timestamp("owner_replied_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -1,4 +1,15 @@
-import * as Location from "expo-location";
+/**
+ * LocationTrackingContext — wraps GpsService + HeartbeatService.
+ *
+ * Exposes:
+ *  - online / setOnline
+ *  - gpsState  (UNKNOWN | SEARCHING | AVAILABLE | LOW_ACCURACY | …)
+ *  - coords    (last validated GpsPosition)
+ *  - permissionDenied
+ *  - toggling
+ *  - setActiveDelivery (4 s GPS interval during active delivery)
+ */
+
 import {
   createContext,
   useCallback,
@@ -11,236 +22,231 @@ import {
 } from "react";
 import { Alert, Platform } from "react-native";
 
-import {
-  updateDriver,
-  updateDriverLocation,
-} from "@workspace/api-client-react";
-
+import * as Location from "expo-location";
+import * as GpsService from "@/services/gps/GpsService";
+import * as HeartbeatService from "@/services/heartbeat/HeartbeatService";
+import { drain } from "@/services/sync/SyncQueue";
+import { getApiBase, setServiceToken } from "@/lib/apiConfig";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useAuth } from "./AuthContext";
+import type { GpsState, GpsPosition } from "@/services/gps/types";
+import { updateDriver } from "@workspace/api-client-react";
 
-interface Coords {
-  latitude: number;
-  longitude: number;
-}
+// ── Context shape ────────────────────────────────────────────────────────────
 
 interface LocationTrackingValue {
-  online: boolean;
-  coords: Coords | null;
-  permissionDenied: boolean;
-  toggling: boolean;
-  setOnline: (next: boolean) => Promise<void>;
-  requestPermission: () => Promise<boolean>;
-  refreshOnce: () => Promise<Coords | null>;
+  readonly online: boolean;
+  readonly gpsState: GpsState;
+  readonly coords: GpsPosition | null;
+  readonly permissionDenied: boolean;
+  readonly toggling: boolean;
+  readonly setOnline: (next: boolean) => Promise<void>;
+  readonly setActiveDelivery: (active: boolean) => Promise<void>;
+  readonly requestPermission: () => Promise<boolean>;
+  readonly refreshOnce: () => Promise<GpsPosition | null>;
 }
 
 const Ctx = createContext<LocationTrackingValue | null>(null);
 
+// ── Provider ─────────────────────────────────────────────────────────────────
+
 export function LocationTrackingProvider({ children }: { children: ReactNode }) {
-  const { driverId, driver, refreshDriver } = useAuth();
-  const [online, setOnlineState] = useState<boolean>(false);
-  const [coords, setCoords] = useState<Coords | null>(null);
+  const { driverId, driver, token, refreshDriver } = useAuth();
+  const { isReachable: isConnected } = useNetworkStatus();
+
+  const [online, setOnlineState] = useState(false);
+  const [gpsState, setGpsState] = useState<GpsState>("UNKNOWN");
+  const [coords, setCoords] = useState<GpsPosition | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [toggling, setToggling] = useState(false);
-  const watcherRef = useRef<Location.LocationSubscription | null>(null);
 
-  // Keep a ref so setOnline can always read the latest driverId synchronously.
   const driverIdRef = useRef<number | null>(driverId);
-  useEffect(() => {
-    driverIdRef.current = driverId;
-  }, [driverId]);
+  useEffect(() => { driverIdRef.current = driverId; }, [driverId]);
 
-  // Sync initial online state from server-side isAvailable.
+  // Keep service token in sync with auth token.
+  useEffect(() => {
+    setServiceToken(token);
+  }, [token]);
+
+  // Restore online state from driver profile on mount / login.
   useEffect(() => {
     if (driver) setOnlineState(!!driver.isAvailable);
   }, [driver?.id, driver?.isAvailable]);
 
-  const stopWatcher = useCallback(() => {
-    if (watcherRef.current) {
-      watcherRef.current.remove();
-      watcherRef.current = null;
-    }
+  // Init GPS service when auth resolves.
+  useEffect(() => {
+    if (!driverId) return;
+    GpsService.init({
+      driverId,
+      onPosition: (pos) => {
+        setCoords(pos);
+        setGpsState("AVAILABLE");
+      },
+      onStateChange: (state) => {
+        setGpsState(state);
+        if (state === "PERMISSION_DENIED") setPermissionDenied(true);
+      },
+    });
+  }, [driverId]);
+
+  // Destroy on unmount.
+  useEffect(() => {
+    return () => {
+      GpsService.destroy().catch(() => {});
+      HeartbeatService.stop();
+    };
   }, []);
+
+  // On network restore, drain queued offline GPS positions.
+  useEffect(() => {
+    if (!isConnected || !driverIdRef.current) return;
+    drain(async (pos) => {
+      const tok = token;
+      if (!tok) throw new Error("no token");
+      const res = await fetch(
+        `${getApiBase()}/api/drivers/${pos.driverId}/location`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${tok}`,
+          },
+          body: JSON.stringify({ latitude: pos.latitude, longitude: pos.longitude }),
+        },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    }).catch(() => {});
+  }, [isConnected, token]);
+
+  // Auto-restart watcher if already marked online (e.g. app resume).
+  useEffect(() => {
+    if (online && driverId && token) {
+      GpsService.start().catch(() => {});
+    }
+  }, [online, driverId, token]);
+
+  // ── Public actions ──────────────────────────────────────────────────────
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
-    if (Platform.OS === "web") {
-      return true;
-    }
-    const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
-      setPermissionDenied(!canAskAgain || status === "denied");
-      return false;
-    }
-    setPermissionDenied(false);
-    return true;
+    const granted = await GpsService.requestPermissions();
+    setPermissionDenied(!granted);
+    return granted;
   }, []);
 
-  const broadcast = useCallback(
-    async (c: Coords) => {
-      const id = driverIdRef.current;
-      if (!id) return;
-      try {
-        await updateDriverLocation(id, {
-          latitude: c.latitude,
-          longitude: c.longitude,
+  const setOnline = useCallback(async (next: boolean) => {
+    setToggling(true);
+    try {
+      let id = driverIdRef.current;
+      if (!id) {
+        try {
+          const drv = await refreshDriver();
+          id = drv?.id ?? null;
+          if (id) driverIdRef.current = id;
+        } catch { /* ignore */ }
+      }
+
+      if (!id) {
+        Alert.alert(
+          "Profil introuvable",
+          "Impossible de charger votre profil. Veuillez vous reconnecter.",
+        );
+        return;
+      }
+
+      if (next) {
+        const granted = await requestPermission();
+        if (!granted) return;
+
+        try { await updateDriver(id, { isAvailable: true }); } catch { /* non-fatal */ }
+
+        GpsService.init({
+          driverId: id,
+          onPosition: (pos) => { setCoords(pos); setGpsState("AVAILABLE"); },
+          onStateChange: (state) => {
+            setGpsState(state);
+            if (state === "PERMISSION_DENIED") setPermissionDenied(true);
+          },
         });
-      } catch {
-        // network errors are non-fatal — next tick will retry
+
+        const started = await GpsService.start();
+        if (!started) { setPermissionDenied(true); return; }
+
+        HeartbeatService.start(id);
+        setOnlineState(true);
+      } else {
+        HeartbeatService.stop();
+        await GpsService.stop();
+        try { await updateDriver(id, { isAvailable: false }); } catch { /* non-fatal */ }
+        setOnlineState(false);
+        setGpsState("UNKNOWN");
+        setCoords(null);
       }
-    },
-    [],
-  );
-
-  const startWatcher = useCallback(async () => {
-    stopWatcher();
-    if (Platform.OS === "web") {
-      if (typeof navigator !== "undefined" && navigator.geolocation) {
-        const id = navigator.geolocation.watchPosition(
-          (pos) => {
-            const c = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-            setCoords(c);
-            broadcast(c);
-          },
-          () => setPermissionDenied(true),
-          { enableHighAccuracy: true, maximumAge: 5000 },
-        );
-        watcherRef.current = {
-          remove: () => navigator.geolocation.clearWatch(id),
-        } as Location.LocationSubscription;
-      }
-      return;
+    } finally {
+      setToggling(false);
     }
-    const sub = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.High,
-        timeInterval: 5000,
-        distanceInterval: 10,
-      },
-      (pos) => {
-        const c = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        setCoords(c);
-        broadcast(c);
-      },
-    );
-    watcherRef.current = sub;
-  }, [broadcast, stopWatcher]);
+  }, [requestPermission, refreshDriver]);
 
-  const refreshOnce = useCallback(async (): Promise<Coords | null> => {
-    const ok = await requestPermission();
-    if (!ok) return null;
-    if (Platform.OS === "web") {
-      return new Promise((resolve) => {
-        if (typeof navigator === "undefined" || !navigator.geolocation) {
-          resolve(null);
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const c = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-            setCoords(c);
-            resolve(c);
-          },
-          () => resolve(null),
-          { enableHighAccuracy: true },
-        );
-      });
-    }
-    const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-    const c = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-    setCoords(c);
-    return c;
-  }, [requestPermission]);
+  const setActiveDelivery = useCallback(async (active: boolean) => {
+    await GpsService.setActiveDelivery(active);
+  }, []);
 
-  const setOnline = useCallback(
-    async (next: boolean) => {
-      setToggling(true);
-      try {
-        // If driverId not yet loaded, attempt a refresh first.
-        let resolvedId = driverIdRef.current;
-        if (!resolvedId) {
-          try {
-            const drv = await refreshDriver();
-            if (drv?.id) {
-              resolvedId = drv.id;
-              driverIdRef.current = drv.id;
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        const id = resolvedId;
-        if (!id) {
-          Alert.alert(
-            "Profil introuvable",
-            "Impossible de charger votre profil livreur. Veuillez vous reconnecter.",
+  /** One-shot position fetch — used by the map screen before GPS is started. */
+  const refreshOnce = useCallback(async (): Promise<GpsPosition | null> => {
+    const granted = await GpsService.requestPermissions();
+    if (!granted) { setPermissionDenied(true); return null; }
+    try {
+      if (Platform.OS === "web") {
+        return new Promise((resolve) => {
+          if (typeof navigator === "undefined" || !navigator.geolocation) { resolve(null); return; }
+          navigator.geolocation.getCurrentPosition(
+            (p) => {
+              const pos: GpsPosition = {
+                latitude: p.coords.latitude, longitude: p.coords.longitude,
+                accuracy: p.coords.accuracy ?? 999, speed: p.coords.speed,
+                heading: p.coords.heading, altitude: p.coords.altitude,
+                timestamp: p.timestamp,
+              };
+              setCoords(pos);
+              resolve(pos);
+            },
+            () => resolve(null),
+            { enableHighAccuracy: true },
           );
-          return;
-        }
-
-        if (next) {
-          const ok = await requestPermission();
-          if (!ok) {
-            setOnlineState(false);
-            return;
-          }
-          try {
-            await updateDriver(id, { isAvailable: true });
-          } catch {
-            // ignore — we'll still start tracking
-          }
-          setOnlineState(true);
-          await startWatcher();
-        } else {
-          stopWatcher();
-          try {
-            await updateDriver(id, { isAvailable: false });
-          } catch {
-            // ignore
-          }
-          setOnlineState(false);
-        }
-      } finally {
-        setToggling(false);
+        });
       }
-    },
-    [refreshDriver, requestPermission, startWatcher, stopWatcher],
-  );
-
-  // Auto-start the watcher if already online (e.g. after relogin).
-  useEffect(() => {
-    if (online && driverId && !watcherRef.current) {
-      (async () => {
-        const ok = await requestPermission();
-        if (ok) await startWatcher();
-      })();
+      const raw = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const pos: GpsPosition = {
+        latitude: raw.coords.latitude, longitude: raw.coords.longitude,
+        accuracy: raw.coords.accuracy ?? 999, speed: raw.coords.speed,
+        heading: raw.coords.heading, altitude: raw.coords.altitude,
+        timestamp: raw.timestamp,
+      };
+      setCoords(pos);
+      return pos;
+    } catch {
+      return null;
     }
-    return () => {
-      // do not stop watcher on every render; only on unmount
-    };
-  }, [online, driverId, requestPermission, startWatcher]);
+  }, []);
 
-  useEffect(() => {
-    return () => stopWatcher();
-  }, [stopWatcher]);
+  // ── Value ────────────────────────────────────────────────────────────────
 
-  const value = useMemo<LocationTrackingValue>(
-    () => ({
-      online,
-      coords,
-      permissionDenied,
-      toggling,
-      setOnline,
-      requestPermission,
-      refreshOnce,
-    }),
-    [online, coords, permissionDenied, toggling, setOnline, requestPermission, refreshOnce],
-  );
+  const value = useMemo<LocationTrackingValue>(() => ({
+    online,
+    gpsState,
+    coords,
+    permissionDenied,
+    toggling,
+    setOnline,
+    setActiveDelivery,
+    requestPermission,
+    refreshOnce,
+  }), [online, gpsState, coords, permissionDenied, toggling, setOnline, setActiveDelivery, requestPermission, refreshOnce]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export function useLocationTracking(): LocationTrackingValue {
   const v = useContext(Ctx);
-  if (!v) throw new Error("useLocationTracking must be used within LocationTrackingProvider");
+  if (!v) throw new Error("useLocationTracking must be inside LocationTrackingProvider");
   return v;
 }

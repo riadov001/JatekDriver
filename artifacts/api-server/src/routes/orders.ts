@@ -8,6 +8,7 @@ import {
   usersTable,
   driversTable,
   driverEarningsTable,
+  chatMessagesTable,
   generateUniqueOrderReference,
   generateKitchenCode,
   generatePickupCode,
@@ -15,6 +16,8 @@ import {
   promoCodeUsagesTable,
   referralsTable,
 } from "@workspace/db";
+import { estimateDeliveryMinutes } from "../lib/eta";
+import { sendWaNotification, WA_MESSAGES } from "../lib/whatsappNotify";
 import { eq, and, inArray, isNull, isNotNull, or, lt, sql } from "drizzle-orm";
 import { requireAuth, attachAuth, type AuthedRequest } from "../middlewares/auth";
 import {
@@ -94,15 +97,35 @@ const NOTIFY_CUSTOMER_MESSAGES: Record<string, { title: string; body: string }> 
 };
 
 router.get("/orders/active", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
-  if (req.userRole !== "admin") {
+  const activeStatuses = ["pending", "accepted", "preparing", "ready", "picked_up", "en_route"];
+  let scopedOrders: (typeof ordersTable.$inferSelect)[];
+
+  if (req.userRole === "admin") {
+    // Admin sees all active orders across the platform.
+    scopedOrders = await db.select().from(ordersTable)
+      .where(inArray(ordersTable.status, activeStatuses));
+
+  } else if (req.userRole === "restaurant_owner") {
+    // Restaurant owners see only active orders for their own restaurants.
+    const ownedRestaurants = await db
+      .select({ id: restaurantsTable.id })
+      .from(restaurantsTable)
+      .where(eq(restaurantsTable.ownerId, req.userId!));
+    const ownedIds = ownedRestaurants.map((r) => r.id);
+    if (ownedIds.length === 0) { res.json([]); return; }
+    scopedOrders = await db.select().from(ordersTable)
+      .where(and(
+        inArray(ordersTable.status, activeStatuses),
+        inArray(ordersTable.restaurantId, ownedIds),
+      ));
+
+  } else {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const activeStatuses = ["pending", "accepted", "preparing", "ready", "picked_up", "en_route"];
-  const orders = await db.select().from(ordersTable).where(inArray(ordersTable.status, activeStatuses));
 
   const ordersWithItems = await Promise.all(
-    orders.map(async (o) => {
+    scopedOrders.map(async (o) => {
       const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, o.id));
       return { ...o, items };
     })
@@ -141,11 +164,46 @@ router.get("/orders", requireAuth, async (req: AuthedRequest, res): Promise<void
     if (driverId) conditions.push(eq(ordersTable.driverId, driverId));
   }
 
-  // Customers may only see their own orders unless filtering as restaurant owner/driver.
+  // Per-role access scoping.
   const role = req.userRole;
-  const filtersRestaurantOrDriver =
-    queryParams.success && (queryParams.data.restaurantId || queryParams.data.driverId);
-  if (role === "customer" || (!filtersRestaurantOrDriver && role !== "admin")) {
+
+  if (role === "admin") {
+    // Admins see all orders; any query filters already applied above.
+
+  } else if (role === "restaurant_owner") {
+    // Restaurant owners may only see orders that belong to restaurants they own.
+    const ownedRestaurants = await db
+      .select({ id: restaurantsTable.id })
+      .from(restaurantsTable)
+      .where(eq(restaurantsTable.ownerId, req.userId!));
+    const ownedIds = ownedRestaurants.map((r) => r.id);
+
+    if (ownedIds.length === 0) {
+      res.json([]);
+      return;
+    }
+
+    if (queryParams.success && queryParams.data.restaurantId) {
+      // Caller filtered by a specific restaurant — make sure they own it.
+      if (!ownedIds.includes(queryParams.data.restaurantId)) {
+        res.status(403).json({ error: "Forbidden: you do not own this restaurant" });
+        return;
+      }
+      // The restaurantId condition was already pushed above; nothing more to add.
+    } else {
+      // No specific restaurant requested — scope to all their restaurants.
+      conditions.push(inArray(ordersTable.restaurantId, ownedIds));
+    }
+
+  } else if (role === "driver") {
+    // Drivers can query orders assigned to them via ?driverId=.
+    // Without that filter, fall back to their own placed orders (rare but valid).
+    if (!(queryParams.success && queryParams.data.driverId)) {
+      conditions.push(eq(ordersTable.userId, req.userId!));
+    }
+
+  } else {
+    // Customers and any other role see only their own placed orders.
     conditions.push(eq(ordersTable.userId, req.userId!));
   }
 
@@ -402,10 +460,38 @@ router.patch("/orders/:id/status", requireAuth, async (req: AuthedRequest, res):
     return;
   }
 
+  // Restaurant owners may only update status for orders belonging to their restaurants.
+  // This guard covers all status transitions; the accepted-branch below re-checks
+  // profile completeness but no longer needs to re-verify ownership.
+  if (req.userRole === "restaurant_owner") {
+    const [targetOrder] = await db
+      .select({ restaurantId: ordersTable.restaurantId })
+      .from(ordersTable)
+      .where(eq(ordersTable.id, params.data.id))
+      .limit(1);
+    if (!targetOrder) { res.status(404).json({ error: "Order not found" }); return; }
+
+    const [targetRestaurant] = await db
+      .select({ ownerId: restaurantsTable.ownerId })
+      .from(restaurantsTable)
+      .where(eq(restaurantsTable.id, targetOrder.restaurantId))
+      .limit(1);
+    if (!targetRestaurant || targetRestaurant.ownerId !== req.userId) {
+      res.status(403).json({ error: "Not authorized: you do not own this restaurant" });
+      return;
+    }
+  }
+
   // Drivers must use the dedicated /confirm-delivery endpoint to mark an order
   // as delivered — that endpoint validates the customer pickup code.
   if (parsed.data.status === "delivered" && req.userRole === "driver") {
     res.status(400).json({ error: "Drivers must confirm delivery via /orders/:id/confirm-delivery with the customer pickup code." });
+    return;
+  }
+
+  // Drivers may not cancel orders — only the customer or an admin may do so.
+  if (parsed.data.status === "cancelled" && req.userRole === "driver") {
+    res.status(403).json({ error: "Drivers cannot cancel orders." });
     return;
   }
 
@@ -433,6 +519,17 @@ router.patch("/orders/:id/status", requireAuth, async (req: AuthedRequest, res):
     updateData.driverId = parsed.data.driverId;
   }
 
+  // Attach status-specific timestamps.
+  const _now = new Date();
+  if (parsed.data.status === "picked_up") updateData.pickedUpAt = _now;
+  if (parsed.data.status === "cancelled") {
+    updateData.cancelledAt = _now;
+    const rawReason = req.body?.cancellationReason;
+    if (typeof rawReason === "string" && rawReason.trim().length > 0) {
+      updateData.cancellationReason = rawReason.trim().slice(0, 500);
+    }
+  }
+
   // On acceptance, gate on owner profile completeness and mint the
   // kitchen + customer pickup codes if not already present.
   if (parsed.data.status === "accepted") {
@@ -457,6 +554,20 @@ router.patch("/orders/:id/status", requireAuth, async (req: AuthedRequest, res):
     }
 
     if (!existing.kitchenCode) updateData.kitchenCode = generateKitchenCode();
+
+    // Stamp acceptedAt and compute ETA: driver→restaurant pickup + prep + last-mile.
+    updateData.acceptedAt = _now;
+    const [driverForEta] = existing.driverId
+      ? await db.select({ latitude: driversTable.latitude, longitude: driversTable.longitude })
+          .from(driversTable).where(eq(driversTable.id, existing.driverId)).limit(1)
+      : [null];
+    updateData.estimatedDeliveryTime = estimateDeliveryMinutes({
+      driverLat: driverForEta?.latitude,
+      driverLon: driverForEta?.longitude,
+      restaurantLat: restaurant.latitude,
+      restaurantLon: restaurant.longitude,
+      restaurantPrepTime: restaurant.deliveryTime,
+    });
   }
 
   const [order] = await db
@@ -510,6 +621,19 @@ router.patch("/orders/:id/status", requireAuth, async (req: AuthedRequest, res):
   const custMsg = customerMessages[order.status];
   if (custMsg) {
     await pushNotification(order.userId, "order_status", custMsg.title, custMsg.body, { orderId: order.id, status: order.status });
+  }
+
+  // WhatsApp / SMS notification (best-effort, never blocks the response)
+  if (["accepted", "en_route", "delivered", "cancelled"].includes(order.status)) {
+    const [custPhone] = await db.select({ phone: usersTable.phone }).from(usersTable)
+      .where(eq(usersTable.id, order.userId)).limit(1);
+    const ref = order.reference ? `#${order.reference}` : `#${order.id}`;
+    let waMsg: string | undefined;
+    if (order.status === "accepted")   waMsg = WA_MESSAGES.accepted(ref, order.restaurantName);
+    else if (order.status === "en_route")   waMsg = WA_MESSAGES.enRoute(ref, "votre livreur");
+    else if (order.status === "delivered")  waMsg = WA_MESSAGES.delivered(ref);
+    else if (order.status === "cancelled")  waMsg = WA_MESSAGES.cancelled(ref, updateData.cancellationReason);
+    if (waMsg) sendWaNotification(custPhone?.phone, waMsg);
   }
 
   // When the driver hits the road, attach the order to their live tracking
@@ -598,8 +722,14 @@ router.post("/orders/:id/accept-delivery", requireAuth, async (req: AuthedReques
   }
 
   // Profile gate — driver must have completed the mandatory onboarding fields
-  // before they can accept any delivery (vehicle plate + national ID).
-  if (req.userRole !== "admin" && !driver.profileCompletedAt) {
+  // (vehicle plate + national ID) before they can accept any delivery.
+  // A driver is considered complete if profileCompletedAt is set OR if both
+  // vehiclePlate and nationalId are non-null (created via admin panel).
+  const profileComplete =
+    !!driver.profileCompletedAt ||
+    (!!driver.vehiclePlate && !!driver.nationalId);
+
+  if (req.userRole !== "admin" && !profileComplete) {
     res.status(412).json({
       error: "Complete your driver profile (vehicle, plate, national ID) before accepting deliveries.",
       code: "DRIVER_PROFILE_INCOMPLETE",
@@ -607,9 +737,16 @@ router.post("/orders/:id/accept-delivery", requireAuth, async (req: AuthedReques
     return;
   }
 
+  // Auto-stamp profileCompletedAt if fields are filled but timestamp is missing
+  if (!driver.profileCompletedAt && driver.vehiclePlate && driver.nationalId) {
+    await db.update(driversTable)
+      .set({ profileCompletedAt: new Date() })
+      .where(eq(driversTable.id, driverId));
+  }
+
   const [order] = await db
     .update(ordersTable)
-    .set({ driverId, status: "picked_up" })
+    .set({ driverId, status: "picked_up", updatedAt: new Date() })
     .where(eq(ordersTable.id, orderId))
     .returning();
 
@@ -623,6 +760,9 @@ router.post("/orders/:id/accept-delivery", requireAuth, async (req: AuthedReques
   // Push notification to customer: driver is on the way
   await pushNotification(order.userId, "order_status", "🛵 En route !", `${driver.name} est en chemin avec votre commande de ${order.restaurantName}.`, { orderId, status: "picked_up" });
 
+  // Mark driver as busy (unavailable) so they stop receiving new available-order offers.
+  await db.update(driversTable).set({ isAvailable: false }).where(eq(driversTable.id, driverId));
+
   // Start tracking the order in the in-memory live state so subsequent driver
   // location pings get fanned out on the order:{id} channel.
   tracking.attachOrder(driverId, orderId);
@@ -635,6 +775,65 @@ router.post("/orders/:id/accept-delivery", requireAuth, async (req: AuthedReques
  * Only the assigned driver (or admin) may notify the customer, and only
  * while the order is actively out for delivery.
  */
+/**
+ * Anonymous driver → customer contact relay.
+ * The driver sends a free-text message; the backend relays it via
+ * WhatsApp/SMS to the customer using "Jatek Livraison" as sender so
+ * neither party's phone number is exposed. The message is also saved
+ * in the order chat and pushed in-app.
+ */
+router.post("/orders/:id/contact-customer", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
+  const orderId = parseInt(String(req.params.id), 10);
+  if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
+
+  const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+  if (!message) { res.status(400).json({ error: "message requis" }); return; }
+  if (message.length > 300) { res.status(400).json({ error: "Message trop long (300 caractères max)" }); return; }
+
+  const [existing] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
+  if (!existing) { res.status(404).json({ error: "Order not found" }); return; }
+
+  // Only the assigned driver or an admin may relay messages.
+  let isDriver = false;
+  let driverName = "Livreur";
+  if (existing.driverId) {
+    const [drv] = await db.select().from(driversTable).where(eq(driversTable.id, existing.driverId)).limit(1);
+    if (drv?.userId === req.userId) { isDriver = true; driverName = drv.name; }
+  }
+  if (!isDriver && req.userRole !== "admin") {
+    res.status(403).json({ error: "Seul le livreur assigné peut contacter le client via cette route" });
+    return;
+  }
+
+  // 1. Anonymous WhatsApp / SMS relay (fire-and-forget — never blocks)
+  const [customer] = await db.select({ phone: usersTable.phone }).from(usersTable)
+    .where(eq(usersTable.id, existing.userId)).limit(1);
+  sendWaNotification(customer?.phone, WA_MESSAGES.driverRelay(message));
+
+  // 2. Store in order chat so the history is complete
+  const [chatMsg] = await db.insert(chatMessagesTable).values({
+    orderId,
+    senderId: req.userId!,
+    senderRole: "driver",
+    senderName: driverName,
+    message,
+  }).returning();
+
+  // 3. In-app push to customer
+  await pushNotification(
+    existing.userId,
+    "driver_message",
+    "🛵 Message de votre livreur",
+    message,
+    { orderId },
+  );
+
+  // 4. SSE fan-out so any open order screen updates live
+  publish(`order:${orderId}`, "chat_message", chatMsg);
+
+  res.json({ ok: true, messageId: chatMsg.id });
+});
+
 router.post("/orders/:id/notify-customer", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
   const orderId = parseInt(String(req.params.id), 10);
   if (isNaN(orderId)) { res.status(400).json({ error: "Invalid order id" }); return; }
@@ -721,7 +920,7 @@ router.post("/orders/:id/confirm-delivery", requireAuth, async (req: AuthedReque
   // ── Mark order as delivered ────────────────────────────────────────────
   const [order] = await db
     .update(ordersTable)
-    .set({ status: "delivered" })
+    .set({ status: "delivered", deliveredAt: new Date() })
     .where(eq(ordersTable.id, orderId))
     .returning();
 

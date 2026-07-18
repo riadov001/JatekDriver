@@ -1,3 +1,4 @@
 - [Push notification architecture](push-notifications.md) — Expo Push API called from backend (ma.jatek.app); pushToken stored on usersTable; PUT /api/push-token to register.
+- [Jatek Driver architecture v1](jatek-driver-arch.md) — GPS/SSE/Heartbeat service layer built in artifacts/livreur; i18n (fr/ar/en); LocationTrackingContext rebuilt on GpsService singleton.
 - [Livreur build port collision](livreur-build-port-collision.md) — livreur's production build script hardcoded Metro port 8081, colliding with the admin dashboard artifact and hanging publish.
 - [Orval codegen typecheck barrel issue](orval-codegen.md) — api-zod's export * barrel causes pre-existing TS2308 ambiguous exports; bypass typecheck:libs by running orval directly if only that step fails.

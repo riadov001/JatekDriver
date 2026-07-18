@@ -29,13 +29,18 @@ async function getExpoPushToken(): Promise<string | null> {
       });
     }
 
-    const { status: existing } = await Notifications.getPermissionsAsync();
-    const finalStatus =
-      existing === "granted"
-        ? existing
-        : (await Notifications.requestPermissionsAsync()).status;
+    // expo-notifications PermissionResponse shape varies by version; use any-cast.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const existing = (await Notifications.getPermissionsAsync()) as any;
+    const alreadyGranted: boolean =
+      existing.granted === true || existing.status === "granted";
 
-    if (finalStatus !== "granted") return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const requested = alreadyGranted ? existing : (await Notifications.requestPermissionsAsync()) as any;
+    const finalGranted: boolean =
+      requested.granted === true || requested.status === "granted";
+
+    if (!finalGranted) return null;
 
     const { data } = await Notifications.getExpoPushTokenAsync({
       projectId: EXPO_PROJECT_ID,

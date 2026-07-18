@@ -60609,6 +60609,16 @@ var init_orders = __esm({
       driverRatingComment: text("driver_rating_comment"),
       /** 1-5 star rating the driver gives the customer. */
       customerRating: integer("customer_rating"),
+      /** Reason provided when the order is cancelled (customer, restaurant, or driver initiated). */
+      cancellationReason: text("cancellation_reason"),
+      /** Timestamp when the restaurant accepted the order. */
+      acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+      /** Timestamp when the driver picked up the order from the restaurant. */
+      pickedUpAt: timestamp("picked_up_at", { withTimezone: true }),
+      /** Timestamp when the order was confirmed delivered to the customer. */
+      deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+      /** Timestamp when the order was cancelled. */
+      cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
       createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
       updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => /* @__PURE__ */ new Date())
     });
@@ -60678,6 +60688,10 @@ var init_reviews = __esm({
       userName: text("user_name").notNull(),
       rating: integer("rating").notNull(),
       comment: text("comment"),
+      /** Reply from the restaurant owner, displayed publicly under the review. */
+      ownerReply: text("owner_reply"),
+      /** Timestamp when the owner posted their reply. */
+      ownerRepliedAt: timestamp("owner_replied_at", { withTimezone: true }),
       createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
     });
     insertReviewSchema = createInsertSchema(reviewsTable).omit({ id: true, createdAt: true });
@@ -258978,36 +258992,54 @@ router2.post("/auth/register", async (req, res) => {
   res.status(201).json({ token, user: safeUser });
 });
 router2.post("/auth/login", async (req, res) => {
-  const parsed = LoginBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+  const { email: email3, phone, password } = req.body ?? {};
+  if (!password || typeof password !== "string") {
+    res.status(400).json({ error: "password is required" });
     return;
   }
-  const { email: email3, password } = parsed.data;
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email3)).limit(1);
+  let user;
+  if (phone && typeof phone === "string" && phone.trim().length >= 7) {
+    const normalized = normalizePhone(phone.trim());
+    const [byPhone] = await db.select().from(usersTable).where(eq(usersTable.phone, normalized)).limit(1);
+    user = byPhone;
+  }
+  if (!user && email3 && typeof email3 === "string" && email3.includes("@")) {
+    const [byEmail] = await db.select().from(usersTable).where(eq(usersTable.email, email3.trim().toLowerCase())).limit(1);
+    user = byEmail;
+  }
   if (!user) {
-    res.status(401).json({ error: "Invalid email or password" });
+    res.status(401).json({ error: "Invalid credentials" });
     return;
   }
   const valid = await bcryptjs_default.compare(password, user.password);
   if (!valid) {
-    res.status(401).json({ error: "Invalid email or password" });
+    res.status(401).json({ error: "Invalid credentials" });
+    return;
+  }
+  if (!user.isActive) {
+    res.status(403).json({ error: "Account disabled. Contact your administrator." });
     return;
   }
   let driverProfile = null;
   if (user.role === "driver") {
-    const [existing] = await db.select().from(driversTable).where(eq(driversTable.userId, user.id)).limit(1);
-    if (!existing) {
-      const [created] = await db.insert(driversTable).values({
-        userId: user.id,
-        name: user.name,
-        phone: user.phone ?? null,
-        isAvailable: true,
-        totalDeliveries: 0
-      }).returning();
-      driverProfile = created ?? null;
-    } else {
-      driverProfile = existing;
+    try {
+      const [existing] = await db.select().from(driversTable).where(eq(driversTable.userId, user.id)).limit(1);
+      if (!existing) {
+        const [created] = await db.insert(driversTable).values({
+          userId: user.id,
+          name: user.name,
+          phone: user.phone ?? null,
+          isAvailable: true,
+          totalDeliveries: 0,
+          totalEarnings: 0
+        }).returning();
+        driverProfile = created ?? null;
+        logger.info({ userId: user.id }, "auto-heal: driver profile created on login");
+      } else {
+        driverProfile = existing;
+      }
+    } catch (err) {
+      logger.error({ userId: user.id, err }, "auto-heal: failed to create driver profile");
     }
   }
   const token = import_jsonwebtoken.default.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: "30d" });
@@ -259526,6 +259558,10 @@ router3.get("/restaurants/featured", async (_req, res) => {
   const restaurants = await db.select().from(restaurantsTable).where(and(eq(restaurantsTable.isVerified, true), eq(restaurantsTable.isOpen, true))).limit(6);
   res.json(restaurants.map(withDeliveryDefaults));
 });
+router3.get("/restaurants/mine", requireAuth, async (req, res) => {
+  const restaurants = await db.select().from(restaurantsTable).where(eq(restaurantsTable.ownerId, req.userId));
+  res.json(restaurants.map(withDeliveryDefaults));
+});
 router3.get("/restaurants", async (req, res) => {
   const params = ListRestaurantsQueryParams.safeParse(req.query);
   const query = params.success ? params.data : {};
@@ -259824,6 +259860,69 @@ var menu_default = router4;
 // src/routes/orders.ts
 var import_express6 = __toESM(require_express2(), 1);
 init_src();
+
+// src/lib/eta.ts
+var DRIVER_SPEED_KMH = 25;
+var DEFAULT_PREP_MIN = 20;
+var LAST_MILE_MIN = 15;
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function estimateDeliveryMinutes(opts) {
+  let pickupMin = 0;
+  if (opts.driverLat && opts.driverLon && opts.restaurantLat && opts.restaurantLon) {
+    const distKm = haversineKm(opts.driverLat, opts.driverLon, opts.restaurantLat, opts.restaurantLon);
+    pickupMin = distKm / DRIVER_SPEED_KMH * 60;
+  }
+  const prepMin = opts.restaurantPrepTime ?? DEFAULT_PREP_MIN;
+  return Math.max(10, Math.min(90, Math.ceil(pickupMin + prepMin + LAST_MILE_MIN)));
+}
+
+// src/lib/whatsappNotify.ts
+async function sendWaNotification(to, body) {
+  if (!to) return;
+  const e1643 = normalisePhone(to);
+  if (!e1643) return;
+  try {
+    await sendOtpMessage(e1643, body);
+  } catch (e) {
+    console.warn("[wa-notify] failed:", e.message?.slice(0, 120));
+  }
+}
+function normalisePhone(raw) {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("212") && digits.length === 12) return `+${digits}`;
+  if ((digits.startsWith("06") || digits.startsWith("07")) && digits.length === 10) {
+    return `+212${digits.slice(1)}`;
+  }
+  if (digits.startsWith("6") || digits.startsWith("7") && digits.length === 9) {
+    return `+212${digits}`;
+  }
+  if (raw.startsWith("+") && digits.length >= 10) return `+${digits}`;
+  return null;
+}
+var WA_MESSAGES = {
+  accepted: (ref, restaurant) => `\u2705 *Jatek* \u2014 Commande ${ref} accept\xE9e par ${restaurant} ! Votre repas est en cours de pr\xE9paration. \u{1F37D}\uFE0F`,
+  preparing: (ref, restaurant) => `\u{1F468}\u200D\u{1F373} *Jatek* \u2014 ${restaurant} pr\xE9pare votre commande ${ref}. Votre livreur sera bient\xF4t en route !`,
+  ready: (ref) => `\u{1F4E6} *Jatek* \u2014 Commande ${ref} pr\xEAte ! Un livreur arrive pour la r\xE9cup\xE9rer.`,
+  enRoute: (ref, driverName) => `\u{1F6F5} *Jatek* \u2014 ${driverName} est en route avec votre commande ${ref}. Pr\xE9parez-vous \xE0 accueillir votre repas !`,
+  delivered: (ref) => `\u{1F389} *Jatek* \u2014 Commande ${ref} livr\xE9e ! Bon app\xE9tit \u{1F374}
+Merci de noter votre exp\xE9rience dans l'application.`,
+  cancelled: (ref, reason) => `\u274C *Jatek* \u2014 Votre commande ${ref} a \xE9t\xE9 annul\xE9e.${reason ? `
+Motif : ${reason}` : ""}
+Besoin d'aide ? Contactez notre support dans l'app.`,
+  /** Anonymous relay: driver → customer */
+  driverRelay: (message) => `\u{1F6F5} *Votre livreur Jatek* :
+\xAB ${message} \xBB
+
+_(Ce message est envoy\xE9 de fa\xE7on anonyme via la plateforme Jatek)_`
+};
+
+// src/routes/orders.ts
 init_drizzle_orm();
 
 // src/lib/sse.ts
@@ -259834,6 +259933,7 @@ function nextId() {
 }
 function subscribe(req, res, channels) {
   const clientId = nextId();
+  req.setTimeout(0);
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
@@ -260063,9 +260163,25 @@ async function notifyAvailableDrivers(orderId, restaurantName, deliveryAddress, 
 async function getOrderWithItems(orderId) {
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
   if (!order) return null;
-  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
-  const [customer] = await db.select({ phone: usersTable.phone }).from(usersTable).where(eq(usersTable.id, order.userId)).limit(1);
-  return { ...order, userPhone: customer?.phone ?? null, items };
+  const [items, customerRow, restaurantRow] = await Promise.all([
+    db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId)),
+    db.select({ phone: usersTable.phone }).from(usersTable).where(eq(usersTable.id, order.userId)).limit(1),
+    db.select({
+      address: restaurantsTable.address,
+      phone: restaurantsTable.phone,
+      latitude: restaurantsTable.latitude,
+      longitude: restaurantsTable.longitude
+    }).from(restaurantsTable).where(eq(restaurantsTable.id, order.restaurantId)).limit(1)
+  ]);
+  return {
+    ...order,
+    userPhone: customerRow[0]?.phone ?? null,
+    restaurantAddress: restaurantRow[0]?.address ?? null,
+    restaurantPhone: restaurantRow[0]?.phone ?? null,
+    restaurantLat: restaurantRow[0]?.latitude ?? null,
+    restaurantLng: restaurantRow[0]?.longitude ?? null,
+    items
+  };
 }
 var NOTIFY_CUSTOMER_MESSAGES = {
   arriving: { title: "\u{1F6F5} Votre livreur arrive", body: "Votre livreur sera \xE0 votre adresse dans quelques minutes." },
@@ -260074,14 +260190,27 @@ var NOTIFY_CUSTOMER_MESSAGES = {
   calling: { title: "\u{1F4DE} Votre livreur essaie de vous joindre", body: "Merci de rester disponible, votre livreur vous appelle." }
 };
 router6.get("/orders/active", requireAuth, async (req, res) => {
-  if (req.userRole !== "admin") {
+  const activeStatuses = ["pending", "accepted", "preparing", "ready", "picked_up", "en_route"];
+  let scopedOrders;
+  if (req.userRole === "admin") {
+    scopedOrders = await db.select().from(ordersTable).where(inArray(ordersTable.status, activeStatuses));
+  } else if (req.userRole === "restaurant_owner") {
+    const ownedRestaurants = await db.select({ id: restaurantsTable.id }).from(restaurantsTable).where(eq(restaurantsTable.ownerId, req.userId));
+    const ownedIds = ownedRestaurants.map((r) => r.id);
+    if (ownedIds.length === 0) {
+      res.json([]);
+      return;
+    }
+    scopedOrders = await db.select().from(ordersTable).where(and(
+      inArray(ordersTable.status, activeStatuses),
+      inArray(ordersTable.restaurantId, ownedIds)
+    ));
+  } else {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const activeStatuses = ["pending", "accepted", "preparing", "ready", "picked_up", "en_route"];
-  const orders = await db.select().from(ordersTable).where(inArray(ordersTable.status, activeStatuses));
   const ordersWithItems = await Promise.all(
-    orders.map(async (o) => {
+    scopedOrders.map(async (o) => {
       const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, o.id));
       return { ...o, items };
     })
@@ -260109,8 +260238,27 @@ router6.get("/orders", requireAuth, async (req, res) => {
     if (driverId) conditions.push(eq(ordersTable.driverId, driverId));
   }
   const role = req.userRole;
-  const filtersRestaurantOrDriver = queryParams.success && (queryParams.data.restaurantId || queryParams.data.driverId);
-  if (role === "customer" || !filtersRestaurantOrDriver && role !== "admin") {
+  if (role === "admin") {
+  } else if (role === "restaurant_owner") {
+    const ownedRestaurants = await db.select({ id: restaurantsTable.id }).from(restaurantsTable).where(eq(restaurantsTable.ownerId, req.userId));
+    const ownedIds = ownedRestaurants.map((r) => r.id);
+    if (ownedIds.length === 0) {
+      res.json([]);
+      return;
+    }
+    if (queryParams.success && queryParams.data.restaurantId) {
+      if (!ownedIds.includes(queryParams.data.restaurantId)) {
+        res.status(403).json({ error: "Forbidden: you do not own this restaurant" });
+        return;
+      }
+    } else {
+      conditions.push(inArray(ordersTable.restaurantId, ownedIds));
+    }
+  } else if (role === "driver") {
+    if (!(queryParams.success && queryParams.data.driverId)) {
+      conditions.push(eq(ordersTable.userId, req.userId));
+    }
+  } else {
     conditions.push(eq(ordersTable.userId, req.userId));
   }
   const orders = conditions.length > 0 ? await db.select().from(ordersTable).where(and(...conditions)) : await db.select().from(ordersTable);
@@ -260293,8 +260441,24 @@ router6.patch("/orders/:id/status", requireAuth, async (req, res) => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  if (req.userRole === "restaurant_owner") {
+    const [targetOrder] = await db.select({ restaurantId: ordersTable.restaurantId }).from(ordersTable).where(eq(ordersTable.id, params.data.id)).limit(1);
+    if (!targetOrder) {
+      res.status(404).json({ error: "Order not found" });
+      return;
+    }
+    const [targetRestaurant] = await db.select({ ownerId: restaurantsTable.ownerId }).from(restaurantsTable).where(eq(restaurantsTable.id, targetOrder.restaurantId)).limit(1);
+    if (!targetRestaurant || targetRestaurant.ownerId !== req.userId) {
+      res.status(403).json({ error: "Not authorized: you do not own this restaurant" });
+      return;
+    }
+  }
   if (parsed.data.status === "delivered" && req.userRole === "driver") {
     res.status(400).json({ error: "Drivers must confirm delivery via /orders/:id/confirm-delivery with the customer pickup code." });
+    return;
+  }
+  if (parsed.data.status === "cancelled" && req.userRole === "driver") {
+    res.status(403).json({ error: "Drivers cannot cancel orders." });
     return;
   }
   if (parsed.data.status === "en_route") {
@@ -260323,6 +260487,15 @@ router6.patch("/orders/:id/status", requireAuth, async (req, res) => {
   if (parsed.data.driverId) {
     updateData.driverId = parsed.data.driverId;
   }
+  const _now = /* @__PURE__ */ new Date();
+  if (parsed.data.status === "picked_up") updateData.pickedUpAt = _now;
+  if (parsed.data.status === "cancelled") {
+    updateData.cancelledAt = _now;
+    const rawReason = req.body?.cancellationReason;
+    if (typeof rawReason === "string" && rawReason.trim().length > 0) {
+      updateData.cancellationReason = rawReason.trim().slice(0, 500);
+    }
+  }
   if (parsed.data.status === "accepted") {
     const [existing] = await db.select().from(ordersTable).where(eq(ordersTable.id, params.data.id)).limit(1);
     if (!existing) {
@@ -260346,6 +260519,15 @@ router6.patch("/orders/:id/status", requireAuth, async (req, res) => {
       return;
     }
     if (!existing.kitchenCode) updateData.kitchenCode = generateKitchenCode();
+    updateData.acceptedAt = _now;
+    const [driverForEta] = existing.driverId ? await db.select({ latitude: driversTable.latitude, longitude: driversTable.longitude }).from(driversTable).where(eq(driversTable.id, existing.driverId)).limit(1) : [null];
+    updateData.estimatedDeliveryTime = estimateDeliveryMinutes({
+      driverLat: driverForEta?.latitude,
+      driverLon: driverForEta?.longitude,
+      restaurantLat: restaurant.latitude,
+      restaurantLon: restaurant.longitude,
+      restaurantPrepTime: restaurant.deliveryTime
+    });
   }
   const [order] = await db.update(ordersTable).set(updateData).where(eq(ordersTable.id, params.data.id)).returning();
   if (!order) {
@@ -260376,6 +260558,16 @@ router6.patch("/orders/:id/status", requireAuth, async (req, res) => {
   const custMsg = customerMessages[order.status];
   if (custMsg) {
     await pushNotification(order.userId, "order_status", custMsg.title, custMsg.body, { orderId: order.id, status: order.status });
+  }
+  if (["accepted", "en_route", "delivered", "cancelled"].includes(order.status)) {
+    const [custPhone] = await db.select({ phone: usersTable.phone }).from(usersTable).where(eq(usersTable.id, order.userId)).limit(1);
+    const ref = order.reference ? `#${order.reference}` : `#${order.id}`;
+    let waMsg;
+    if (order.status === "accepted") waMsg = WA_MESSAGES.accepted(ref, order.restaurantName);
+    else if (order.status === "en_route") waMsg = WA_MESSAGES.enRoute(ref, "votre livreur");
+    else if (order.status === "delivered") waMsg = WA_MESSAGES.delivered(ref);
+    else if (order.status === "cancelled") waMsg = WA_MESSAGES.cancelled(ref, updateData.cancellationReason);
+    if (waMsg) sendWaNotification(custPhone?.phone, waMsg);
   }
   if (parsed.data.status === "en_route" && order.driverId) {
     attachOrder(order.driverId, order.id);
@@ -260446,21 +260638,78 @@ router6.post("/orders/:id/accept-delivery", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Not authorized to accept on behalf of another driver" });
     return;
   }
-  if (req.userRole !== "admin" && !driver.profileCompletedAt) {
+  const profileComplete = !!driver.profileCompletedAt || !!driver.vehiclePlate && !!driver.nationalId;
+  if (req.userRole !== "admin" && !profileComplete) {
     res.status(412).json({
       error: "Complete your driver profile (vehicle, plate, national ID) before accepting deliveries.",
       code: "DRIVER_PROFILE_INCOMPLETE"
     });
     return;
   }
-  const [order] = await db.update(ordersTable).set({ driverId, status: "picked_up" }).where(eq(ordersTable.id, orderId)).returning();
+  if (!driver.profileCompletedAt && driver.vehiclePlate && driver.nationalId) {
+    await db.update(driversTable).set({ profileCompletedAt: /* @__PURE__ */ new Date() }).where(eq(driversTable.id, driverId));
+  }
+  const [order] = await db.update(ordersTable).set({ driverId, status: "picked_up", updatedAt: /* @__PURE__ */ new Date() }).where(eq(ordersTable.id, orderId)).returning();
   const orderWithItems = await getOrderWithItems(order.id);
   publish(`order:${orderId}`, "order_status", { orderId, status: "picked_up", driverName: driver.name, order: orderWithItems });
   publish(`restaurant:${order.restaurantId}`, "order_status", { orderId, status: "picked_up", driverName: driver.name });
   publish("admin_tracking", "order_status", { orderId, status: "picked_up", driverId, driverName: driver.name });
   await pushNotification(order.userId, "order_status", "\u{1F6F5} En route !", `${driver.name} est en chemin avec votre commande de ${order.restaurantName}.`, { orderId, status: "picked_up" });
+  await db.update(driversTable).set({ isAvailable: false }).where(eq(driversTable.id, driverId));
   attachOrder(driverId, orderId);
   res.json(orderWithItems);
+});
+router6.post("/orders/:id/contact-customer", requireAuth, async (req, res) => {
+  const orderId = parseInt(String(req.params.id), 10);
+  if (isNaN(orderId)) {
+    res.status(400).json({ error: "Invalid order id" });
+    return;
+  }
+  const message = typeof req.body?.message === "string" ? req.body.message.trim() : "";
+  if (!message) {
+    res.status(400).json({ error: "message requis" });
+    return;
+  }
+  if (message.length > 300) {
+    res.status(400).json({ error: "Message trop long (300 caract\xE8res max)" });
+    return;
+  }
+  const [existing] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+  let isDriver = false;
+  let driverName = "Livreur";
+  if (existing.driverId) {
+    const [drv] = await db.select().from(driversTable).where(eq(driversTable.id, existing.driverId)).limit(1);
+    if (drv?.userId === req.userId) {
+      isDriver = true;
+      driverName = drv.name;
+    }
+  }
+  if (!isDriver && req.userRole !== "admin") {
+    res.status(403).json({ error: "Seul le livreur assign\xE9 peut contacter le client via cette route" });
+    return;
+  }
+  const [customer] = await db.select({ phone: usersTable.phone }).from(usersTable).where(eq(usersTable.id, existing.userId)).limit(1);
+  sendWaNotification(customer?.phone, WA_MESSAGES.driverRelay(message));
+  const [chatMsg] = await db.insert(chatMessagesTable).values({
+    orderId,
+    senderId: req.userId,
+    senderRole: "driver",
+    senderName: driverName,
+    message
+  }).returning();
+  await pushNotification(
+    existing.userId,
+    "driver_message",
+    "\u{1F6F5} Message de votre livreur",
+    message,
+    { orderId }
+  );
+  publish(`order:${orderId}`, "chat_message", chatMsg);
+  res.json({ ok: true, messageId: chatMsg.id });
 });
 router6.post("/orders/:id/notify-customer", requireAuth, async (req, res) => {
   const orderId = parseInt(String(req.params.id), 10);
@@ -260534,7 +260783,7 @@ router6.post("/orders/:id/confirm-delivery", requireAuth, async (req, res) => {
     res.status(400).json({ error: "Code OTP incorrect \u2014 demandez au client de relire son code", code: "INVALID_OTP" });
     return;
   }
-  const [order] = await db.update(ordersTable).set({ status: "delivered" }).where(eq(ordersTable.id, orderId)).returning();
+  const [order] = await db.update(ordersTable).set({ status: "delivered", deliveredAt: /* @__PURE__ */ new Date() }).where(eq(ordersTable.id, orderId)).returning();
   const DRIVER_SHARE = 0.8;
   const driverEarning = Math.round((order.deliveryFee ?? 0) * DRIVER_SHARE * 100) / 100;
   if (driver) {
@@ -260909,11 +261158,7 @@ router8.get("/drivers", requireAuth, async (req, res) => {
   const drivers2 = conditions.length > 0 ? await db.select().from(driversTable).where(and(...conditions)) : await db.select().from(driversTable);
   res.json(drivers2);
 });
-router8.get("/drivers/me", async (req, res) => {
-  if (!req.userId) {
-    res.status(401).json({ error: "Authentication required" });
-    return;
-  }
+router8.get("/drivers/me", requireAuth, async (req, res) => {
   const [driver] = await db.select().from(driversTable).where(eq(driversTable.userId, req.userId)).limit(1);
   if (!driver) {
     res.status(404).json({ error: "Driver not found" });
@@ -261326,6 +261571,36 @@ router9.delete("/reviews/:id", requireAuth, async (req, res) => {
   }
   await db.delete(reviewsTable).where(eq(reviewsTable.id, params.data.id));
   res.sendStatus(204);
+});
+router9.patch("/reviews/:id/reply", requireRole("admin", "restaurant_owner"), async (req, res) => {
+  const id = parseInt(String(req.params.id), 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const reply = typeof req.body?.reply === "string" ? req.body.reply.trim() : "";
+  if (!reply || reply.length < 2) {
+    res.status(400).json({ error: "reply is required (min 2 characters)" });
+    return;
+  }
+  if (reply.length > 1e3) {
+    res.status(400).json({ error: "reply trop long (1000 caract\xE8res max)" });
+    return;
+  }
+  const [existing] = await db.select().from(reviewsTable).where(eq(reviewsTable.id, id)).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Review not found" });
+    return;
+  }
+  if (req.userRole !== "admin") {
+    const [restaurant] = await db.select({ ownerId: restaurantsTable.ownerId }).from(restaurantsTable).where(eq(restaurantsTable.id, existing.restaurantId)).limit(1);
+    if (!restaurant || restaurant.ownerId !== req.userId) {
+      res.status(403).json({ error: "Forbidden: you do not own this restaurant" });
+      return;
+    }
+  }
+  const [updated] = await db.update(reviewsTable).set({ ownerReply: reply, ownerRepliedAt: /* @__PURE__ */ new Date() }).where(eq(reviewsTable.id, id)).returning();
+  res.json(updated);
 });
 var reviews_default = router9;
 
@@ -262724,6 +262999,7 @@ router19.post("/backend/drivers", requireAuth, async (req, res) => {
       role: "driver",
       isActive: true
     }).returning();
+    const profileComplete = !!(vehiclePlate && nationalId);
     const [driver] = await db.insert(driversTable).values({
       userId: newUser.id,
       name: name.trim(),
@@ -262731,7 +263007,8 @@ router19.post("/backend/drivers", requireAuth, async (req, res) => {
       vehicleType: vehicleType ?? null,
       vehiclePlate: vehiclePlate ?? null,
       nationalId: nationalId ?? null,
-      licenseNumber: licenseNumber ?? null
+      licenseNumber: licenseNumber ?? null,
+      profileCompletedAt: profileComplete ? /* @__PURE__ */ new Date() : null
     }).returning();
     res.status(201).json({ ...driver, tempPassword });
   } catch (e) {

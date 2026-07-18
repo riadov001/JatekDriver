@@ -10,7 +10,7 @@ import {
   GetRestaurantStatsParams,
   ListRestaurantsQueryParams,
 } from "@workspace/api-zod";
-import { requireRole, type AuthedRequest } from "../middlewares/auth";
+import { requireRole, requireAuth, type AuthedRequest } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
@@ -52,6 +52,19 @@ router.get("/restaurants/featured", async (_req, res): Promise<void> => {
     .from(restaurantsTable)
     .where(and(eq(restaurantsTable.isVerified, true), eq(restaurantsTable.isOpen, true)))
     .limit(6);
+  res.json(restaurants.map(withDeliveryDefaults));
+});
+
+/**
+ * Shortcut for the authenticated restaurant owner to retrieve all restaurants they own.
+ * Equivalent to GET /restaurants?ownerId=<myUserId> but without requiring the caller
+ * to know their own userId upfront.
+ */
+router.get("/restaurants/mine", requireAuth, async (req: AuthedRequest, res): Promise<void> => {
+  const restaurants = await db
+    .select()
+    .from(restaurantsTable)
+    .where(eq(restaurantsTable.ownerId, req.userId!));
   res.json(restaurants.map(withDeliveryDefaults));
 });
 

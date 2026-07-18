@@ -24,6 +24,11 @@ function nextId() { return String(++_counter); }
 export function subscribe(req: Request, res: Response, channels: string[]): void {
   const clientId = nextId();
 
+  // Disable the default 30 s request timeout for long-lived SSE connections —
+  // the heartbeat below keeps the socket alive; the timeout would otherwise
+  // silently drop the connection before the first heartbeat fires.
+  req.setTimeout(0);
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");

@@ -3,11 +3,12 @@ import {
   useConfirmOrderDelivery,
   useNotifyCustomer,
   useGetOrder,
+  getGetOrderQueryKey,
   type Order,
 } from "@workspace/api-client-react";
 import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -61,6 +62,7 @@ export default function OrderDetailScreen() {
 
   const ordersQuery = useGetOrder(orderId, {
     query: {
+      queryKey: getGetOrderQueryKey(orderId),
       enabled: !!orderId,
       refetchInterval: 8000,
     },
@@ -80,12 +82,12 @@ export default function OrderDetailScreen() {
     refetch: refetchDirections,
   } = useDirections(
     isActive ? coords : null,
-    isActive ? order?.restaurantAddress ?? order?.restaurantName : undefined,
+    isActive ? order?.restaurantName : undefined,
     isActive ? order?.deliveryAddress : undefined,
   );
 
-  // Auto-follow driver on map
-  useMemo(() => {
+  // Auto-follow driver on map — must be useEffect, not useMemo (side effect).
+  useEffect(() => {
     if (followDriver && coords && mapRef.current && Platform.OS !== "web") {
       mapRef.current.animateToRegion(
         { latitude: coords.latitude, longitude: coords.longitude, latitudeDelta: 0.012, longitudeDelta: 0.012 },

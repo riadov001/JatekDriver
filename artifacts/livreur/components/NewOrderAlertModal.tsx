@@ -1,6 +1,22 @@
+/**
+ * NewOrderAlertModal — displayed when a new delivery is available.
+ *
+ * Shows all the information the driver needs to make a decision:
+ *   • Restaurant name
+ *   • Delivery address
+ *   • Item count
+ *   • Total order amount
+ *   • Estimated driver earnings
+ *   • Payment method
+ *   • Countdown bar + seconds remaining
+ *
+ * The driver has ALERT_COUNTDOWN_SECONDS to accept or decline.
+ * On timeout, the order is auto-declined (onExpire).
+ */
+
 import { Feather } from "@expo/vector-icons";
 import type { Order } from "@workspace/api-client-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -24,7 +40,16 @@ interface NewOrderAlertModalProps {
   onExpire: () => void;
 }
 
-export function NewOrderAlertModal({
+function paymentLabel(method?: string | null): string {
+  switch (method) {
+    case "cash":    return "Espèces";
+    case "card":    return "Carte";
+    case "online":  return "En ligne";
+    default:        return method ?? "—";
+  }
+}
+
+export const NewOrderAlertModal = memo(function NewOrderAlertModal({
   order,
   visible,
   countdownSeconds,
@@ -39,6 +64,7 @@ export function NewOrderAlertModal({
   const onExpireRef = useRef(onExpire);
   onExpireRef.current = onExpire;
 
+  // Reset + start countdown each time the modal becomes visible.
   useEffect(() => {
     if (!visible) return;
     setSecondsLeft(countdownSeconds);
@@ -55,10 +81,24 @@ export function NewOrderAlertModal({
     return () => clearInterval(interval);
   }, [visible, countdownSeconds]);
 
+  const handleDecline = useCallback(() => {
+    if (!accepting) onDecline();
+  }, [accepting, onDecline]);
+
   if (!order) return null;
 
   const progress = secondsLeft / countdownSeconds;
-  const estimatedGain = ((order.deliveryFee ?? 0) * 0.8).toFixed(2);
+  // Estimated gain: 80% of delivery fee, or fallback to 15% of total.
+  const estimatedGain = order.deliveryFee
+    ? (order.deliveryFee * 0.8).toFixed(2)
+    : (order.total * 0.15).toFixed(2);
+
+  const orderAny = order as unknown as Record<string, unknown>;
+  const itemCount = Array.isArray(orderAny.items) ? (orderAny.items as unknown[]).length : null;
+  const paymentMethod = typeof orderAny.paymentMethod === "string" ? orderAny.paymentMethod : null;
+  const isUrgent = secondsLeft <= 8;
+
+  const countdownColor = isUrgent ? colors.destructive : colors.accent;
 
   return (
     <Modal visible={visible} transparent animationType="slide" statusBarTranslucent>
@@ -74,70 +114,126 @@ export function NewOrderAlertModal({
             },
           ]}
         >
+          {/* ── Countdown bar ── */}
           <View style={styles.countdownRow}>
             <View style={[styles.countdownTrack, { backgroundColor: colors.border }]}>
               <View
                 style={[
                   styles.countdownFill,
-                  { backgroundColor: colors.accent, width: `${Math.max(progress, 0) * 100}%` },
+                  {
+                    backgroundColor: countdownColor,
+                    width: `${Math.max(progress, 0) * 100}%`,
+                  },
                 ]}
               />
             </View>
-            <Text style={[styles.countdownText, { color: colors.mutedForeground }]}>
+            <Text style={[styles.countdownText, { color: countdownColor }]}>
               {secondsLeft}s
             </Text>
           </View>
 
+          {/* ── Header ── */}
           <View style={styles.headerRow}>
             <View style={[styles.pulseIcon, { backgroundColor: colors.primary + "22" }]}>
               <Feather name="zap" size={22} color={colors.primary} />
             </View>
-            <Text style={[styles.title, { color: colors.foreground }]}>Nouvelle course !</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.title, { color: colors.foreground }]}>
+                Nouvelle course !
+              </Text>
+              {itemCount != null && (
+                <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+                  {itemCount} article{itemCount !== 1 ? "s" : ""}
+                </Text>
+              )}
+            </View>
           </View>
 
+          {/* ── Order info card ── */}
           <View style={[styles.infoCard, { backgroundColor: colors.background, borderRadius: colors.radius }]}>
-            <Text style={[styles.restaurant, { color: colors.foreground }]} numberOfLines={1}>
-              {order.restaurantName}
-            </Text>
+            {/* Restaurant */}
             <View style={styles.row}>
-              <Feather name="map-pin" size={14} color={colors.primary} />
+              <Feather name="home" size={14} color={colors.primary} />
+              <Text style={[styles.restaurantName, { color: colors.foreground }]} numberOfLines={1}>
+                {order.restaurantName}
+              </Text>
+            </View>
+
+            {/* Delivery address */}
+            <View style={styles.row}>
+              <Feather name="map-pin" size={14} color={colors.accent} />
               <Text style={[styles.rowText, { color: colors.mutedForeground }]} numberOfLines={2}>
                 {order.deliveryAddress}
               </Text>
             </View>
+
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            {/* Metrics row */}
             <View style={styles.metricsRow}>
-              <View>
-                <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>Total commande</Text>
+              <View style={styles.metric}>
+                <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>
+                  Total commande
+                </Text>
                 <Text style={[styles.metricValue, { color: colors.foreground }]}>
                   {order.total.toFixed(2)} MAD
                 </Text>
               </View>
-              <View style={{ alignItems: "flex-end" }}>
-                <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>Votre gain</Text>
-                <Text style={[styles.metricValue, { color: colors.success }]}>+{estimatedGain} MAD</Text>
+
+              <View style={styles.metric}>
+                <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>
+                  Votre gain
+                </Text>
+                <Text style={[styles.metricValue, { color: colors.success }]}>
+                  +{estimatedGain} MAD
+                </Text>
               </View>
+
+              {paymentMethod && (
+                <View style={styles.metric}>
+                  <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>
+                    Paiement
+                  </Text>
+                  <Text style={[styles.metricValue, { color: colors.foreground, fontSize: 14 }]}>
+                    {paymentLabel(paymentMethod)}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
+          {/* ── Actions ── */}
           <View style={styles.actionsRow}>
             <Pressable
-              onPress={onDecline}
+              onPress={handleDecline}
               disabled={accepting}
+              accessibilityLabel="Refuser la course"
               style={[
                 styles.declineBtn,
-                { borderColor: colors.border, borderRadius: colors.radius, opacity: accepting ? 0.6 : 1 },
+                {
+                  borderColor: colors.border,
+                  borderRadius: colors.radius,
+                  opacity: accepting ? 0.5 : 1,
+                },
               ]}
             >
               <Feather name="x" size={20} color={colors.mutedForeground} />
-              <Text style={[styles.declineText, { color: colors.mutedForeground }]}>Ignorer</Text>
+              <Text style={[styles.declineText, { color: colors.mutedForeground }]}>
+                Refuser
+              </Text>
             </Pressable>
+
             <Pressable
               onPress={onAccept}
               disabled={accepting}
+              accessibilityLabel="Accepter la course"
               style={[
                 styles.acceptBtn,
-                { backgroundColor: colors.primary, borderRadius: colors.radius, opacity: accepting ? 0.85 : 1 },
+                {
+                  backgroundColor: colors.primary,
+                  borderRadius: colors.radius,
+                  opacity: accepting ? 0.85 : 1,
+                },
               ]}
             >
               {accepting ? (
@@ -154,7 +250,7 @@ export function NewOrderAlertModal({
       </View>
     </Modal>
   );
-}
+});
 
 const styles = StyleSheet.create({
   backdrop: {
@@ -171,11 +267,32 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -6 },
     elevation: Platform.OS === "android" ? 12 : 0,
   },
-  countdownRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  countdownTrack: { flex: 1, height: 5, borderRadius: 3, overflow: "hidden" },
-  countdownFill: { height: "100%", borderRadius: 3 },
-  countdownText: { fontFamily: "Inter_700Bold", fontSize: 13, minWidth: 30, textAlign: "right" },
-  headerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  countdownRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  countdownTrack: {
+    flex: 1,
+    height: 5,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  countdownFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  countdownText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    minWidth: 32,
+    textAlign: "right",
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
   pulseIcon: {
     width: 44,
     height: 44,
@@ -183,16 +300,63 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  title: { fontFamily: "Inter_700Bold", fontSize: 22, letterSpacing: -0.5 },
-  infoCard: { padding: 16, gap: 8 },
-  restaurant: { fontFamily: "Inter_700Bold", fontSize: 17 },
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  rowText: { fontFamily: "Inter_500Medium", fontSize: 13, flex: 1 },
-  divider: { height: 1, marginVertical: 4 },
-  metricsRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
-  metricLabel: { fontFamily: "Inter_500Medium", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 },
-  metricValue: { fontFamily: "Inter_700Bold", fontSize: 20, marginTop: 2 },
-  actionsRow: { flexDirection: "row", gap: 12 },
+  title: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  infoCard: {
+    padding: 14,
+    gap: 10,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  restaurantName: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    flex: 1,
+  },
+  rowText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+  divider: {
+    height: 1,
+  },
+  metricsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  metric: {
+    minWidth: 80,
+  },
+  metricLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 3,
+  },
+  metricValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
   declineBtn: {
     flex: 1,
     flexDirection: "row",
@@ -201,8 +365,12 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 16,
     borderWidth: 1.5,
+    minHeight: 56,
   },
-  declineText: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  declineText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
   acceptBtn: {
     flex: 2,
     flexDirection: "row",
@@ -210,6 +378,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     paddingVertical: 16,
+    minHeight: 56,
   },
-  acceptText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
+  acceptText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: "#fff",
+  },
 });

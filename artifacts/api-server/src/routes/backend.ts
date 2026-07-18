@@ -580,6 +580,9 @@ router.post("/backend/drivers", requireAuth, async (req: AuthedRequest, res): Pr
       isActive: true,
     }).returning();
 
+    // Auto-stamp profileCompletedAt when the admin provides both required fields.
+    const profileComplete = !!(vehiclePlate && nationalId);
+
     const [driver] = await db.insert(driversTable).values({
       userId: newUser.id,
       name: name.trim(),
@@ -588,6 +591,7 @@ router.post("/backend/drivers", requireAuth, async (req: AuthedRequest, res): Pr
       vehiclePlate: vehiclePlate ?? null,
       nationalId: nationalId ?? null,
       licenseNumber: licenseNumber ?? null,
+      profileCompletedAt: profileComplete ? new Date() : null,
     }).returning();
 
     // Return driver record + temporary password so admin can share it with the driver

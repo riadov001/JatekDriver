@@ -100,10 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await storage.setItemAsync(TOKEN_KEY, res.token);
     setToken(res.token);
     setUser(res.user);
-    // Prefer driver embedded in login response (avoids /api/drivers/me call)
-    if (res.driver) {
-      setDriver(res.driver);
-      await storage.setItemAsync(DRIVER_ID_KEY, String(res.driver.id));
+    // Prefer driver embedded in login response (avoids /api/drivers/me call).
+    // Cast because some backend versions include driver in AuthResponse.
+    const resAny = res as typeof res & { driver?: import("@workspace/api-client-react").Driver };
+    if (resAny.driver) {
+      setDriver(resAny.driver);
+      await storage.setItemAsync(DRIVER_ID_KEY, String(resAny.driver.id));
     } else {
       try {
         const drv = await fetchMyDriver();

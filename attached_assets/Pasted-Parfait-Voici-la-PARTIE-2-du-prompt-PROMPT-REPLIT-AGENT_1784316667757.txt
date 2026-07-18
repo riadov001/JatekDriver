@@ -1,0 +1,315 @@
+Parfait. Voici la PARTIE 2 du prompt.
+PROMPT REPLIT AGENT — JATEK DRIVER
+PARTIE 2 — GPS • Tracking • Temps réel • Offline
+GÉOLOCALISATION
+Tu développes une application de livraison professionnelle.
+La localisation est la fonctionnalité la plus importante.
+Tu privilégies toujours :
+précision
+stabilité
+faible consommation batterie
+reprise automatique
+La position du chauffeur doit rester fiable pendant toute la livraison.
+CYCLE GPS
+Le GPS possède plusieurs états.
+UNKNOWN
+
+SEARCHING
+
+AVAILABLE
+
+LOW_ACCURACY
+
+TEMPORARILY_UNAVAILABLE
+
+DISABLED
+
+PERMISSION_DENIED
+Chaque état possède son UI.
+Aucun écran ne doit rester bloqué.
+PERMISSIONS
+Toujours vérifier :
+Foreground Location
+Background Location
+Notifications
+Battery Optimization
+Foreground Service Android
+Précision GPS
+Si une permission manque :
+ne jamais planter.
+Afficher un assistant de configuration.
+BACKGROUND LOCATION
+L'application doit continuer à fonctionner :
+écran éteint
+application en arrière-plan
+verrouillage téléphone
+navigation GPS
+Le tracking continue tant qu'une livraison est active.
+QUALITÉ GPS
+Toujours conserver :
+accuracy
+
+speed
+
+heading
+
+altitude
+
+timestamp
+
+provider
+Ne jamais envoyer une position ancienne.
+Ignorer une position si :
+accuracy > 50 mètres
+
+timestamp trop ancien
+
+latitude invalide
+
+longitude invalide
+FRÉQUENCE GPS
+Deux modes.
+Disponible
+Toutes les 15 secondes.
+Livraison active
+Toutes les 3 à 5 secondes.
+La fréquence s'adapte automatiquement.
+ÉCONOMIE BATTERIE
+Réduire automatiquement la fréquence GPS lorsque :
+chauffeur immobile
+écran verrouillé
+aucune commande
+mode offline
+batterie faible
+HEARTBEAT
+Le backend considère un chauffeur hors ligne après 30 secondes sans activité.
+Tu implémentes un Heartbeat.
+Toutes les 20 secondes
+Le heartbeat est indépendant du GPS.
+Même sans nouvelle position GPS :
+le heartbeat continue.
+FILE D'ATTENTE
+Si Internet disparaît.
+Les positions GPS sont stockées.
+Queue FIFO
+Lorsque Internet revient :
+Synchroniser dans l'ordre.
+Ne jamais perdre une position.
+DÉDUPLICATION
+Ne jamais envoyer deux fois la même position.
+Comparer :
+timestamp
+
+latitude
+
+longitude
+
+accuracy
+MODE OFFLINE
+Le chauffeur peut :
+ouvrir l'application
+consulter ses commandes
+voir son historique
+naviguer
+consulter son profil
+même sans réseau.
+Toutes les actions sont mises en attente.
+SYNCHRONISATION
+Lorsque Internet revient :
+Synchroniser automatiquement :
+GPS
+
+Heartbeat
+
+Statut commande
+
+Messages
+
+Notifications
+
+Historique
+Sans intervention utilisateur.
+TEMPS RÉEL
+Le backend expose un canal SSE.
+Toujours préférer :
+Server Sent Events
+Avant :
+Polling.
+Le polling devient un mode de secours.
+SSE
+Écouter :
+driver:{id}
+
+driver_orders:{id}
+
+available_orders
+Reconnecter automatiquement.
+Backoff exponentiel.
+Détection réseau.
+SI SSE TOMBE
+Basculer automatiquement sur :
+Polling.
+Toutes les 12 secondes.
+Retour vers SSE dès qu'il revient.
+LATENCE
+Objectif.
+Nouvelle commande visible :
+moins de 2 secondes.
+NOTIFICATIONS PUSH
+Chaque notification possède :
+id
+
+type
+
+timestamp
+
+payload
+
+orderId
+
+driverId
+Ne jamais utiliser de texte libre.
+Toujours utiliser des types.
+TYPES PUSH
+NEW_ORDER
+
+ORDER_CANCELLED
+
+ORDER_UPDATED
+
+CHAT
+
+PAYMENT
+
+SYSTEM
+
+PROMOTION
+PUSH TOKEN
+Toujours récupérer :
+Constants.expoConfig.extra.eas.projectId
+Jamais :
+process.env.EXPO_PUBLIC_REPL_ID
+DÉMARRAGE APPLICATION
+Au lancement :
+vérifier token
+vérifier GPS
+vérifier permissions
+vérifier réseau
+ouvrir SSE
+charger commandes
+charger profil
+charger gains
+charger paramètres
+CYCLE APPLICATION
+Gérer :
+Cold Start
+
+Foreground
+
+Background
+
+Resume
+
+Terminate
+Chaque transition doit être propre.
+NAVIGATION GPS
+Toujours conserver :
+Current Position
+
+Pickup Position
+
+Dropoff Position
+
+ETA
+
+Distance
+
+Speed
+Le calcul ETA est mis à jour automatiquement.
+GOOGLE MAPS
+Optimiser.
+Ne jamais rerender toute la carte.
+Mettre à jour uniquement :
+Marker Driver
+
+Polyline
+
+Camera
+MARKERS
+Animations fluides.
+Interpolation.
+Aucun saut de position.
+POLYLINE
+Mettre à jour uniquement si :
+itinéraire changé
+pickup changé
+livraison changée
+COMMANDE ACTIVE
+Une seule commande active.
+Toujours respecter les états.
+ASSIGNED
+
+ACCEPTED
+
+ARRIVED_PICKUP
+
+PICKED_UP
+
+ON_ROUTE
+
+ARRIVED_DESTINATION
+
+DELIVERED
+
+CANCELLED
+Ne jamais permettre un état impossible.
+VALIDATION
+Avant chaque changement de statut :
+vérifier token
+vérifier commande
+vérifier chauffeur
+vérifier GPS
+vérifier réseau
+REPRISE APRÈS CRASH
+Si l'application redémarre :
+Retrouver automatiquement :
+commande active
+itinéraire
+tracking
+timer
+navigation
+CACHE
+Conserver localement :
+profil
+historique
+gains
+paramètres
+commandes
+notifications
+DONNÉES SENSIBLES
+Ne jamais stocker :
+mot de passe
+JWT en clair si stockage sécurisé disponible
+clé API
+clé Google
+secret
+GESTION D'ERREURS
+Chaque erreur possède :
+Code
+
+Cause
+
+Action utilisateur
+
+Retry possible
+
+Logs
+Jamais :
+Une erreur est survenue.
+Toujours expliquer clairement.
+OBJECTIFS
+Le chauffeur ne doit jamais se demander :
+"Est-ce que l'application fonctionne ?"
+L'application doit toujours afficher son état.
+Fin de la PARTIE 2.
+La PARTIE 3 couvrira le moteur des commandes (acceptation, refus, navigation, livraison, gains, sécurité, optimisation React Native, architecture Expo, qualité du code, tests automatiques et Definition of Done), avec un niveau de détail comparable aux standards d'Uber Driver.

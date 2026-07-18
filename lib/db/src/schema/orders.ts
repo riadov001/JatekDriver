@@ -39,6 +39,16 @@ export const ordersTable = pgTable("orders", {
   driverRatingComment: text("driver_rating_comment"),
   /** 1-5 star rating the driver gives the customer. */
   customerRating: integer("customer_rating"),
+  /** Reason provided when the order is cancelled (customer, restaurant, or driver initiated). */
+  cancellationReason: text("cancellation_reason"),
+  /** Timestamp when the restaurant accepted the order. */
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  /** Timestamp when the driver picked up the order from the restaurant. */
+  pickedUpAt: timestamp("picked_up_at", { withTimezone: true }),
+  /** Timestamp when the order was confirmed delivered to the customer. */
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  /** Timestamp when the order was cancelled. */
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

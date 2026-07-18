@@ -16,13 +16,19 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { GpsStatusBanner } from "@/components/GpsStatusBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LocationTrackingProvider } from "@/contexts/LocationTrackingContext";
 import { NewOrderAlertProvider } from "@/contexts/NewOrderAlertContext";
 import { useColors } from "@/hooks/useColors";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { setApiBase } from "@/lib/apiConfig";
 import { storage } from "@/lib/storage";
+import { detectLocale } from "@/i18n";
+
+// Detect device locale once at module load time (synchronous).
+detectLocale();
 
 const REMOTE_CONFIG_CACHE_KEY = "jatek_remote_config";
 
@@ -42,6 +48,7 @@ const BOOTSTRAP_URL = (
   .replace(/\/+$/, "");
 
 setBaseUrl(BOOTSTRAP_URL);
+setApiBase(BOOTSTRAP_URL);
 
 setAuthTokenGetter(async () => {
   try {
@@ -88,7 +95,9 @@ async function loadRemoteConfig(): Promise<void> {
       if (res.ok) {
         const config: RemoteConfig = await res.json();
         if (config.primaryUrl) {
-          setBaseUrl(config.primaryUrl.replace(/\/+$/, ""));
+          const url = config.primaryUrl.replace(/\/+$/, "");
+          setBaseUrl(url);
+          setApiBase(url);
           await storage.setItemAsync(REMOTE_CONFIG_CACHE_KEY, JSON.stringify(config));
         }
       }
@@ -99,7 +108,9 @@ async function loadRemoteConfig(): Promise<void> {
         if (cached) {
           const config: RemoteConfig = JSON.parse(cached);
           if (config.primaryUrl) {
-            setBaseUrl(config.primaryUrl.replace(/\/+$/, ""));
+            const url = config.primaryUrl.replace(/\/+$/, "");
+            setBaseUrl(url);
+            setApiBase(url);
           }
         }
       } catch {
@@ -120,6 +131,7 @@ function RootLayoutNav() {
   const colors = useColors();
   return (
     <View style={{ flex: 1 }}>
+      <GpsStatusBanner />
       <Stack
         screenOptions={{
           headerStyle: { backgroundColor: colors.background },

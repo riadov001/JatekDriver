@@ -17,7 +17,10 @@
     "ios": {
       "supportsTablet": false,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Permet de partager votre position en temps r\u00e9el pendant les livraisons"
+        "NSLocationWhenInUseUsageDescription": "Permet de partager votre position en temps réel pendant les livraisons.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Permet le suivi GPS en arrière-plan pendant une livraison active, même si l'application est fermée.",
+        "NSLocationAlwaysUsageDescription": "Permet le suivi GPS en arrière-plan pendant une livraison active.",
+        "UIBackgroundModes": ["location", "fetch", "remote-notification"]
       },
       "bundleIdentifier": "com.jatekdrive.app"
     },
@@ -26,10 +29,20 @@
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK",
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -45,6 +58,16 @@
       "expo-font",
       "expo-web-browser",
       "expo-local-authentication",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Jatek Driver utilise votre position pour le suivi des livraisons en temps réel.",
+          "locationAlwaysPermission": "Jatek Driver utilise votre position en arrière-plan pendant les livraisons actives.",
+          "locationWhenInUsePermission": "Jatek Driver utilise votre position pour le suivi des livraisons.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
       [
         "expo-notifications",
         {
