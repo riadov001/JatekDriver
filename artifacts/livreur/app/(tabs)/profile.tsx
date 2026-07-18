@@ -44,7 +44,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, driver, logout } = useAuth();
-  const { setOnline } = useLocationTracking();
+  const { online, setOnline } = useLocationTracking();
 
   const handleLogout = () => {
     const doLogout = async () => {
@@ -65,11 +65,12 @@ export default function ProfileScreen() {
     }
   };
 
-  const initials = (driver?.name ?? user?.name ?? "??")
+  const fullName: string = driver?.name ?? user?.name ?? "??";
+  const initials: string = fullName
     .split(" ")
-    .filter(Boolean)
+    .filter((w: string) => w.length > 0)
     .slice(0, 2)
-    .map((s) => s[0]?.toUpperCase() ?? "")
+    .map((w: string) => w[0].toUpperCase())
     .join("");
 
   const webTopInset = Platform.OS === "web" ? 67 : 0;
@@ -106,7 +107,7 @@ export default function ProfileScreen() {
           <View style={styles.badgeRow}>
             <View style={[styles.badge, { backgroundColor: colors.primary + "33" }]}>
               <Text style={[styles.badgeText, { color: colors.primary }]}>
-                {driver?.isAvailable ? "En ligne" : "Hors ligne"}
+                {online ? "En ligne" : "Hors ligne"}
               </Text>
             </View>
             {driver?.rating != null ? (

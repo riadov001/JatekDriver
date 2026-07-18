@@ -11,6 +11,7 @@ import {
 import { storage } from "@/lib/storage";
 
 import {
+  ApiError,
   customFetch,
   type AuthResponse,
   type Driver,
@@ -76,12 +77,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setDriver(null);
           await storage.deleteItemAsync(DRIVER_ID_KEY);
         }
-      } catch {
-        await storage.deleteItemAsync(TOKEN_KEY);
-        await storage.deleteItemAsync(DRIVER_ID_KEY);
-        setToken(null);
-        setUser(null);
-        setDriver(null);
+      } catch (err) {
+        // Only invalidate the token for explicit auth rejections (401/403).
+        // Network errors, timeouts, and server errors (5xx) must NOT log the
+        // user out — the token is still valid and will work once connectivity
+        // is restored.
+        const isAuthError =
+          err instanceof ApiError && (err.status === 401 || err.status === 403);
+        if (isAuthError) {
+          await storage.deleteItemAsync(TOKEN_KEY);
+          await storage.deleteItemAsync(DRIVER_ID_KEY);
+          setToken(null);
+          setUser(null);
+          setDriver(null);
+        }
+        // On non-auth errors: keep the stored token and stay "logged in" with
+        // no user/driver data; screens will refetch when connectivity returns.
       }
     } finally {
       setLoading(false);

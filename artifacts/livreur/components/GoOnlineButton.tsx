@@ -15,7 +15,7 @@ interface GoOnlineButtonProps {
   online: boolean;
   toggling: boolean;
   permissionDenied: boolean;
-  onToggle: (next: boolean) => void;
+  onToggle: (next: boolean) => void | Promise<void>;
 }
 
 export function GoOnlineButton({

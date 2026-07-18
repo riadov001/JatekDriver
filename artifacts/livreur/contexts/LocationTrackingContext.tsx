@@ -212,7 +212,52 @@ export function LocationTrackingProvider({ children }: { children: ReactNode }) 
             () => resolve(null),
             { enableHighAccuracy: true },
           );
+<<<<<<< HEAD
         });
+=======
+          return;
+        }
+
+        if (next) {
+          // Block go-online if the driver's profile is not yet complete.
+          // Prefer a fresh fetch; fall back to the cached driver from context
+          // so transient network errors don't produce a false "profil incomplet".
+          const freshDriver = await refreshDriver();
+          const profileDone = freshDriver
+            ? !!freshDriver.profileCompletedAt
+            : !!driver?.profileCompletedAt;
+          if (!profileDone) {
+            Alert.alert(
+              "Profil incomplet",
+              "Veuillez compléter votre profil avant de passer en ligne.",
+            );
+            return;
+          }
+
+          const ok = await requestPermission();
+          if (!ok) {
+            setOnlineState(false);
+            return;
+          }
+          try {
+            await updateDriver(id, { isAvailable: true });
+          } catch {
+            // ignore — we'll still start tracking
+          }
+          setOnlineState(true);
+          await startWatcher();
+        } else {
+          stopWatcher();
+          try {
+            await updateDriver(id, { isAvailable: false });
+          } catch {
+            // ignore
+          }
+          setOnlineState(false);
+        }
+      } finally {
+        setToggling(false);
+>>>>>>> f24c0f5195b5fe178633cac7dd4f567c249e8539
       }
       const raw = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const pos: GpsPosition = {

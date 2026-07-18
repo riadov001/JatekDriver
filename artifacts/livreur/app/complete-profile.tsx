@@ -36,7 +36,11 @@ export default function CompleteProfileScreen() {
     mutation: {
       onSuccess: async () => {
         await refreshDriver();
-        router.back();
+        Alert.alert(
+          "Profil complété",
+          "Votre profil a été enregistré avec succès. Vous pouvez maintenant accepter des livraisons.",
+          [{ text: "Continuer", onPress: () => router.replace("/(tabs)") }]
+        );
       },
       onError: (err: unknown) => {
         const msg =

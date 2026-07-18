@@ -130,6 +130,7 @@ function PushNotificationRegistrar() {
 function RootLayoutNav() {
   const colors = useColors();
   return (
+<<<<<<< HEAD
     <View style={{ flex: 1 }}>
       <GpsStatusBanner />
       <Stack
@@ -153,6 +154,29 @@ function RootLayoutNav() {
       </Stack>
       <OfflineBanner />
     </View>
+=======
+    <Stack
+      screenOptions={{
+        headerStyle: { backgroundColor: colors.background },
+        headerTintColor: colors.foreground,
+        headerTitleStyle: { fontFamily: "Inter_600SemiBold" },
+        contentStyle: { backgroundColor: colors.background },
+        headerBackTitle: "Retour",
+      }}
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="register" options={{ headerShown: false }} />
+      <Stack.Screen name="pending-validation" options={{ headerShown: false }} />
+      <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+      <Stack.Screen name="complete-profile" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="order/[id]"
+        options={{ headerShown: true, title: "Commande" }}
+      />
+    </Stack>
+>>>>>>> f24c0f5195b5fe178633cac7dd4f567c249e8539
   );
 }
 

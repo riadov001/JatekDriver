@@ -58,9 +58,9 @@ export default function OrdersScreen() {
   );
 
   const filtered: Order[] = useMemo(() => {
-    const all = ordersQuery.data ?? [];
-    if (filter === "active") return all.filter((o) => ACTIVE_STATUSES.includes(o.status));
-    if (filter === "delivered") return all.filter((o) => o.status === "delivered");
+    const all: Order[] = (ordersQuery.data as Order[] | undefined) ?? [];
+    if (filter === "active") return all.filter((o: Order) => ACTIVE_STATUSES.includes(o.status as OrderStatus));
+    if (filter === "delivered") return all.filter((o: Order) => o.status === "delivered");
     return all;
   }, [ordersQuery.data, filter]);
 
@@ -118,7 +118,7 @@ export default function OrdersScreen() {
             tintColor={colors.primary}
           />
         }
-        scrollEnabled={filtered.length > 0}
+        scrollEnabled
         ListEmptyComponent={
           ordersQuery.isError ? (
             <View style={styles.errorState}>
