@@ -7,7 +7,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_BACKEND_BASE_URL_API": "REPLACE_WITH_YOUR_BACKEND_URL"
+        "EXPO_PUBLIC_BACKEND_BASE_URL_API": "ma.jatek.app"
       }
     },
     "preview": {
@@ -16,7 +16,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_BACKEND_BASE_URL_API": "REPLACE_WITH_YOUR_BACKEND_URL"
+        "EXPO_PUBLIC_BACKEND_BASE_URL_API": "ma.jatek.app"
       }
     },
     "production": {
