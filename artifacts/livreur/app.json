@@ -17,14 +17,14 @@
     "ios": {
       "supportsTablet": false,
       "infoPlist": {
-<<<<<<< HEAD
         "NSLocationWhenInUseUsageDescription": "Permet de partager votre position en temps réel pendant les livraisons.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Permet le suivi GPS en arrière-plan pendant une livraison active, même si l'application est fermée.",
         "NSLocationAlwaysUsageDescription": "Permet le suivi GPS en arrière-plan pendant une livraison active.",
-        "UIBackgroundModes": ["location", "fetch", "remote-notification"]
-=======
-        "NSLocationWhenInUseUsageDescription": "Permet de partager votre position en temps réel pendant les livraisons"
->>>>>>> f24c0f5195b5fe178633cac7dd4f567c249e8539
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification"
+        ]
       },
       "bundleIdentifier": "com.jatekdrive.app"
     },
@@ -65,16 +65,11 @@
       [
         "expo-location",
         {
-<<<<<<< HEAD
           "locationAlwaysAndWhenInUsePermission": "Jatek Driver utilise votre position pour le suivi des livraisons en temps réel.",
           "locationAlwaysPermission": "Jatek Driver utilise votre position en arrière-plan pendant les livraisons actives.",
           "locationWhenInUsePermission": "Jatek Driver utilise votre position pour le suivi des livraisons.",
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
-=======
-          "locationAlwaysAndWhenInUsePermission": "Permet de partager votre position en temps réel pendant les livraisons.",
-          "locationWhenInUsePermission": "Permet de partager votre position en temps réel pendant les livraisons."
->>>>>>> f24c0f5195b5fe178633cac7dd4f567c249e8539
         }
       ],
       [
